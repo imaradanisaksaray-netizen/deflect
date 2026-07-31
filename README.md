@@ -48,6 +48,14 @@ DOM'suz test edilebilir. 14 test var; en önemlisi spawner'ın **ulaşılamaz me
 üretmediğini doğrulayan test — aynı anda gelen iki merminin arası kalkanın dönemeyeceği
 kadar açık olamaz.
 
+## Yayın
+
+Adım adım rehber: [docs/publishing.md](docs/publishing.md) — itch.io yükleme ayarları,
+GitHub Pages kurulumu ve Playables başvurusu.
+
+`main` dalına her push, testler geçtiği sürece GitHub Pages'i otomatik günceller
+(`.github/workflows/deploy-pages.yml`).
+
 ## Playables paketi
 
 ```bash
