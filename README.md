@@ -1,8 +1,12 @@
 # DEFLECT — Neon Reflex Arcade
 
+**▶ Oyna: https://imaradanisaksaray-netizen.github.io/deflect/**
+
 Tarayıcıda çalışan, bağımlılığı olmayan hyper-casual refleks oyunu. YouTube Playables'ın
 teknik kurallarına uygun yazıldı: saf HTML5, tek klasör, her ekran oranında oynanabilir,
-26 KB paket boyutu.
+28 KB paket boyutu.
+
+![DEFLECT](docs/screenshots/02-gameplay.png)
 
 > Kod ve oyun içi metinler İngilizce (hedef kitle küresel). Dokümantasyon Türkçe.
 
