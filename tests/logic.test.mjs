@@ -15,7 +15,7 @@ import { angleDelta, clamp, normalizeAngle } from '../game/src/math.js';
 import { createShield, registerImpact, shieldCovers, updateShield } from '../game/src/entities/shield.js';
 import { createProjectile, timeToRadius, updateProjectiles } from '../game/src/entities/projectiles.js';
 import { resolveCollisions } from '../game/src/systems/collision.js';
-import { createSpawner, updateSpawner } from '../game/src/systems/spawner.js';
+import { FAIRNESS, createSpawner, updateSpawner } from '../game/src/systems/spawner.js';
 import { difficultyAt } from '../game/src/systems/difficulty.js';
 
 const SHIELD_RADIUS = CONFIG.world.shieldRadius;
@@ -197,19 +197,6 @@ test('overtime hazard mix rises but stays under its ceilings', () => {
   );
 });
 
-/** Runs ~100 seconds of spawning at a fixed point on the difficulty curve. */
-function simulateSpawns(elapsed) {
-  const state = makeState();
-  const spawner = createSpawner();
-  const difficulty = difficultyAt(elapsed);
-
-  for (let step = 0; step < 6000; step += 1) {
-    updateSpawner(spawner, state, difficulty, 1 / 60);
-    updateProjectiles(state.projectiles, 1 / 60);
-  }
-  return state.projectiles;
-}
-
 function assertNoUnreachablePairs(projectiles, label) {
   const blockable = projectiles.filter((p) => p.archetype.blockable);
 
@@ -220,20 +207,58 @@ function assertNoUnreachablePairs(projectiles, label) {
         timeToRadius(blockable[i], SHIELD_RADIUS) - timeToRadius(blockable[j], SHIELD_RADIUS),
       );
       assert.ok(
-        !(timeGap <= 0.32 && gap > 2.1),
+        !(timeGap <= FAIRNESS.simultaneousWindow && gap > FAIRNESS.unreachableGap),
         `${label}: unreachable pair, gap ${gap.toFixed(2)} rad within ${timeGap.toFixed(3)}s`,
       );
     }
   }
 }
 
+/**
+ * Runs ~5.5 minutes of spawning at a fixed point on the difficulty curve and
+ * checks the invariant every time a shard appears.
+ *
+ * Checking only the final frame is what let a real violation slip through
+ * locally: bad pairs are created, fly in and get removed long before the
+ * simulation ends.
+ */
+function assertFairSpawning(elapsed, label) {
+  const state = makeState();
+  const spawner = createSpawner();
+  const difficulty = difficultyAt(elapsed);
+  let spawnCount = 0;
+
+  for (let step = 0; step < 20000; step += 1) {
+    const before = state.projectiles.length;
+    updateSpawner(spawner, state, difficulty, 1 / 60);
+
+    if (state.projectiles.length > before) {
+      spawnCount += state.projectiles.length - before;
+      assertNoUnreachablePairs(state.projectiles, label);
+    }
+    updateProjectiles(state.projectiles, 1 / 60);
+  }
+
+  assert.ok(spawnCount > 200, `${label}: expected a busy simulation, got ${spawnCount} spawns`);
+}
+
+test('a burst never asks for a spread wider than the shield can cover', () => {
+  const { burstMinSeparation, burstMaxSeparation } = CONFIG.difficulty;
+
+  assert.ok(burstMinSeparation < burstMaxSeparation);
+  assert.ok(
+    burstMaxSeparation <= FAIRNESS.unreachableGap,
+    'burst spread above the reachability limit forces the placement fallback',
+  );
+});
+
 test('the spawner never creates an unreachable pair of blockable shards', () => {
   const { rampDuration } = CONFIG.difficulty;
 
   // Both phases matter: the plateau is where bursts peak, and deep overtime is
   // where speed is highest — fairness has to survive both.
-  assertNoUnreachablePairs(simulateSpawns(rampDuration), 'plateau');
-  assertNoUnreachablePairs(simulateSpawns(rampDuration + 400), 'deep overtime');
+  assertFairSpawning(rampDuration, 'plateau');
+  assertFairSpawning(rampDuration + 400, 'deep overtime');
 });
 
 test('spawned shards always start outside the visible corner', () => {

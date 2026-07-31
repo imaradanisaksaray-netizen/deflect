@@ -52,8 +52,13 @@ export const CONFIG = {
     goldChance: 0.09,
     /** Late-game chance of spawning two shards at once. */
     burstChanceEnd: 0.34,
-    /** Minimum angular gap between shards spawned in the same burst. */
+    /**
+     * Angular gap between shards spawned in the same burst. The maximum must
+     * stay below the reachability limit in spawner.js, otherwise a burst can
+     * ask for a spread the shield physically cannot cover.
+     */
     burstMinSeparation: 1.4,
+    burstMaxSeparation: 2.0,
   },
 
   /**
