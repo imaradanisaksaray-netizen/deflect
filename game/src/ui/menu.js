@@ -14,11 +14,17 @@ import { PICKUP_TYPES, SHARD_TYPES } from '../config.js';
 import { THEMES, blocksUntil, isThemeUnlocked } from '../themes/index.js';
 import { unlockedTypeKeys } from '../progress/unlocks.js';
 
-/** Tabs along the bottom of the main menu. */
+/**
+ * Tabs along the bottom of the main menu.
+ *
+ * Labels are kept short and close in length so four of them fit side by side on
+ * a phone without the row turning into a ransom note of mismatched widths.
+ */
 export const MENU_TABS = [
   { id: 'themes', label: 'THEMES' },
+  { id: 'scores', label: 'SCORES' },
   { id: 'stats', label: 'STATS' },
-  { id: 'help', label: 'HOW TO PLAY' },
+  { id: 'help', label: 'GUIDE' },
 ];
 
 /**
@@ -38,10 +44,11 @@ const MIN_TOUCH = 44;
  */
 export function tabButtons(viewport) {
   const { width, height, unit } = viewport;
-  // Wide enough for the longest label ("HOW TO PLAY") at the button font size.
-  const buttonWidth = Math.max(unit * 0.245, MIN_TOUCH);
+  // Four tabs plus their gaps have to clear the narrow side of the viewport,
+  // which is exactly one reference unit.
+  const buttonWidth = Math.max(unit * 0.21, MIN_TOUCH);
   const buttonHeight = Math.max(unit * 0.058, MIN_TOUCH);
-  const gap = unit * 0.022;
+  const gap = unit * 0.018;
   const total = MENU_TABS.length * buttonWidth + (MENU_TABS.length - 1) * gap;
   const startX = width / 2 - total / 2;
   const y = height * 0.93 - buttonHeight / 2;

@@ -7,7 +7,9 @@
  * Every rectangle comes from ui/menu.js, the same source the hit test reads.
  */
 
-import { backButton, helpEntries, statRows, themeButtons } from '../ui/menu.js';
+import { formatAge } from '../progress/leaderboard.js';
+import { getTheme } from '../themes/index.js';
+import { backButton, formatDuration, helpEntries, statRows, themeButtons } from '../ui/menu.js';
 import { drawPickupIcon, drawShardIcon } from './entities.js';
 import { neonText, plainText, withAlpha } from './neon.js';
 
@@ -172,6 +174,123 @@ function drawSwatch(ctx, button, unit, alpha) {
   });
   ctx.restore();
 }
+
+/**
+ * The local leaderboard.
+ *
+ * The run just finished is highlighted when it placed, which is the only reason
+ * a player opens this screen straight after dying — they want to see where they
+ * landed, not read ten rows looking for themselves.
+ */
+export function drawScoresScreen(ctx, game) {
+  const { theme, viewport, board, lastRank, time } = game;
+  const { width, height, unit } = viewport;
+
+  drawBackdrop(ctx, viewport, 0.82);
+  drawTitle(ctx, game, 'SCORES');
+
+  if (!board.length) {
+    plainText(ctx, 'NO RUNS YET', width / 2, height * 0.45, {
+      size: unit * 0.03,
+      color: theme.colors.textDim,
+      spacing: unit * 0.01,
+      alpha: 0.8,
+    });
+    plainText(ctx, 'YOUR TEN BEST RUNS WILL LIVE HERE', width / 2, height * 0.45 + unit * 0.05, {
+      size: unit * 0.02,
+      color: theme.colors.textDim,
+      spacing: unit * 0.005,
+      alpha: 0.5,
+    });
+    drawBack(ctx, game, [backButton(viewport)]);
+    return;
+  }
+
+  const { firstRowY, rowHeight } = SCORE_LAYOUT;
+  const now = Date.now();
+  // Column rails, as offsets from the centre in units.
+  const rankX = width / 2 - unit * 0.3;
+  const scoreX = width / 2 - unit * 0.09;
+  const timeX = width / 2 + unit * 0.06;
+  const ageX = width / 2 + unit * 0.3;
+
+  board.forEach((entry, index) => {
+    const y = height * firstRowY + index * unit * rowHeight;
+    const isLatest = index + 1 === lastRank;
+    // The fresh entry pulses rather than simply changing colour, so it is found
+    // by peripheral vision instead of by reading.
+    const emphasis = isLatest ? 0.75 + 0.25 * Math.sin(time * 5) : 1;
+    const color = isLatest ? theme.colors.gold : theme.colors.text;
+    const entryTheme = getTheme(entry.themeId);
+
+    plainText(ctx, String(index + 1).padStart(2, '0'), rankX, y, {
+      size: unit * 0.022,
+      color: theme.colors.textDim,
+      spacing: unit * 0.003,
+      align: 'right',
+      font: 'mono',
+      alpha: 0.6,
+    });
+
+    // A dot in the theme the run was played in — the board doubles as a record
+    // of which palettes the player has actually lived in.
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(rankX + unit * 0.03, y, unit * 0.008, 0, Math.PI * 2);
+    ctx.fillStyle = entryTheme.colors.shard;
+    ctx.fill();
+    ctx.restore();
+
+    plainText(ctx, String(entry.score), scoreX, y, {
+      size: unit * 0.026,
+      color,
+      spacing: unit * 0.004,
+      align: 'right',
+      font: 'mono',
+      alpha: emphasis,
+    });
+
+    plainText(ctx, formatDuration(entry.seconds), timeX, y, {
+      size: unit * 0.021,
+      color: theme.colors.textDim,
+      spacing: unit * 0.003,
+      align: 'right',
+      font: 'mono',
+      alpha: 0.75,
+    });
+
+    plainText(ctx, `${entry.blocks} BLOCKS`, timeX + unit * 0.02, y, {
+      size: unit * 0.018,
+      color: theme.colors.textDim,
+      spacing: unit * 0.002,
+      align: 'left',
+      alpha: 0.55,
+    });
+
+    plainText(ctx, formatAge(entry.at, now), ageX, y, {
+      size: unit * 0.017,
+      color: theme.colors.textDim,
+      spacing: unit * 0.002,
+      align: 'right',
+      alpha: 0.45,
+    });
+  });
+
+  drawBack(ctx, game, [backButton(viewport)]);
+}
+
+/**
+ * Score row geometry, as fractions of height and unit.
+ *
+ * Exported for the same reason the help layout is: a full board of ten rows is
+ * a state most players reach only after weeks, so overflow here would go
+ * unnoticed for a long time.
+ */
+export const SCORE_LAYOUT = {
+  firstRowY: 0.27,
+  rowHeight: 0.045,
+};
 
 export function drawStatsScreen(ctx, game) {
   const { theme, viewport, profile } = game;

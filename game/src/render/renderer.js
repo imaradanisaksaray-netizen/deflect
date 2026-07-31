@@ -12,7 +12,12 @@ import { createBackground, drawBackground, updateBackground } from './background
 import { drawCore, drawPickups, drawProjectiles, drawShield } from './entities.js';
 import { drawEffects } from './effects.js';
 import { drawGameOver, drawHud, drawMenu, drawPaused } from './hud.js';
-import { drawHelpScreen, drawStatsScreen, drawThemeScreen } from './screens.js';
+import {
+  drawHelpScreen,
+  drawScoresScreen,
+  drawStatsScreen,
+  drawThemeScreen,
+} from './screens.js';
 
 export function createRenderer(ctx, viewport, theme) {
   return { ctx, viewport, background: createBackground(theme), themeId: theme.id };
@@ -57,6 +62,7 @@ export function render(renderer, game, dt) {
 
   if (game.screen === SCREEN.menu) drawMenu(ctx, game);
   else if (game.screen === SCREEN.themes) drawThemeScreen(ctx, game);
+  else if (game.screen === SCREEN.scores) drawScoresScreen(ctx, game);
   else if (game.screen === SCREEN.stats) drawStatsScreen(ctx, game);
   else if (game.screen === SCREEN.help) drawHelpScreen(ctx, game);
   else if (game.screen === SCREEN.paused) drawPaused(ctx, game);

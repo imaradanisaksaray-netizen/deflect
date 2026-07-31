@@ -28,6 +28,7 @@ import { resolveCollisions } from '../systems/collision.js';
 import { createPickupSpawner, updatePickupSpawner, updatePickups } from '../systems/pickups.js';
 import { createSpawner, updateSpawner } from '../systems/spawner.js';
 import { difficultyAt } from '../systems/difficulty.js';
+import { addRun, loadBoard, saveBoard } from '../progress/leaderboard.js';
 import { loadProfile, markUnlocksSeen, recordRun, saveProfile } from '../progress/profile.js';
 import { collectUnlocks, unlockedTypeKeys } from '../progress/unlocks.js';
 import { getTheme } from '../themes/index.js';
@@ -40,12 +41,15 @@ export const SCREEN = {
   paused: 'paused',
   gameover: 'gameover',
   themes: 'themes',
+  scores: 'scores',
   stats: 'stats',
   help: 'help',
 };
 
 /** Screens that are part of the menu flow rather than a run. */
-const MENU_SCREENS = new Set([SCREEN.menu, SCREEN.themes, SCREEN.stats, SCREEN.help]);
+const MENU_SCREENS = new Set([
+  SCREEN.menu, SCREEN.themes, SCREEN.scores, SCREEN.stats, SCREEN.help,
+]);
 
 export const isMenuScreen = (screen) => MENU_SCREENS.has(screen);
 
@@ -59,6 +63,10 @@ export function createGame(viewport, input) {
     reducedMotion,
     /** Persistent progress across runs. Replaced (not mutated) on every save. */
     profile,
+    /** The ten best runs on this device, best first. */
+    board: loadBoard(),
+    /** Where the run that just ended landed on the board; 0 means it missed. */
+    lastRank: 0,
     theme: getTheme(profile.themeId),
     /** Unlocks earned by the run that just ended, shown once on the score screen. */
     pendingUnlocks: [],
@@ -153,6 +161,20 @@ function endRun(game) {
     : after;
   saveProfile(game.profile);
 
+  // The board records what the run was, not just what it scored, so the theme
+  // and shape of every entry is preserved alongside the number.
+  const placement = addRun(game.board, {
+    score,
+    seconds: game.elapsed,
+    blocks: game.blocks,
+    streak: game.bestCombo,
+    themeId: game.theme.id,
+    at: Date.now(),
+  });
+  game.board = placement.board;
+  game.lastRank = placement.rank;
+  saveBoard(game.board);
+
   if (score > game.highScore) {
     game.highScore = score;
     game.newRecord = true;
@@ -173,7 +195,8 @@ export function applyTheme(game, themeId) {
 export function handleAction(game) {
   if (game.screen === SCREEN.menu) return activateMenu(game);
   if (game.screen === SCREEN.themes) return activateThemePicker(game);
-  if (game.screen === SCREEN.stats || game.screen === SCREEN.help) {
+  if (game.screen === SCREEN.scores || game.screen === SCREEN.stats
+    || game.screen === SCREEN.help) {
     return activateSubScreen(game);
   }
   if (game.screen === SCREEN.paused) game.screen = SCREEN.playing;
@@ -268,7 +291,8 @@ export function navigateMenu(game, direction) {
 export function menuButtonsFor(game) {
   if (game.screen === SCREEN.menu) return tabButtons(game.viewport);
   if (game.screen === SCREEN.themes) return themeButtons(game.viewport, game.profile);
-  if (game.screen === SCREEN.stats || game.screen === SCREEN.help) {
+  if (game.screen === SCREEN.scores || game.screen === SCREEN.stats
+    || game.screen === SCREEN.help) {
     return [backButton(game.viewport)];
   }
   return [];

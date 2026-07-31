@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 
 import { PICKUP_TYPES, SHARD_TYPES } from '../game/src/config.js';
 import { HELP_LAYOUT } from '../game/src/render/screens.js';
+import { SCREEN } from '../game/src/state/game.js';
 import { createProfile } from '../game/src/progress/profile.js';
 import { THEMES } from '../game/src/themes/index.js';
 import {
@@ -195,10 +196,10 @@ test('durations read naturally at every scale', () => {
 });
 
 test('every tab maps to a real screen id', () => {
-  // The tab id is used directly as the screen name, so a typo here would be a
-  // button that silently does nothing.
-  const screens = new Set(['themes', 'stats', 'help']);
+  // The tab id is used directly as the screen name, so a typo would be a button
+  // that silently does nothing. Checked against the real screen table rather
+  // than a copy of it, so adding a tab cannot quietly drift past this test.
   for (const tab of MENU_TABS) {
-    assert.ok(screens.has(tab.id), `${tab.id} is not a screen`);
+    assert.equal(SCREEN[tab.id], tab.id, `${tab.id} is not a screen`);
   }
 });

@@ -10,6 +10,7 @@ import { CONFIG, PICKUP_TYPES } from '../config.js';
 import { isMuted } from '../audio.js';
 import { clamp, easeOutCubic } from '../math.js';
 import { SCREEN } from '../state/game.js';
+import { cutoffScore } from '../progress/leaderboard.js';
 import { nextThemeGoal } from '../progress/unlocks.js';
 import { tabButtons } from '../ui/menu.js';
 import { drawShardIcon } from './entities.js';
@@ -396,13 +397,15 @@ export function drawGameOver(ctx, game) {
     intensity: reveal,
   });
 
-  const subtitle = newRecord ? 'NEW RECORD' : `BEST ${highScore}`;
-  plainText(ctx, subtitle, width / 2, height * 0.55, {
+  // A rank is more informative than "NEW RECORD" once the player has a board:
+  // it says how close they came, not just whether they won.
+  const subtitle = rankSubtitle(game);
+  plainText(ctx, subtitle.text, width / 2, height * 0.55, {
     size: unit * 0.032,
-    color: newRecord ? theme.colors.gold : theme.colors.textDim,
+    color: subtitle.celebrate ? theme.colors.gold : theme.colors.textDim,
     spacing: unit * 0.012,
-    font: newRecord ? 'sans' : 'mono',
-    alpha: newRecord ? 0.75 + 0.25 * Math.sin(time * 6) : 0.8,
+    font: subtitle.celebrate ? 'sans' : 'mono',
+    alpha: subtitle.celebrate ? 0.75 + 0.25 * Math.sin(time * 6) : 0.8,
   });
 
   plainText(ctx, `LONGEST STREAK  ${bestCombo}`, width / 2, height * 0.61, {
@@ -422,6 +425,28 @@ export function drawGameOver(ctx, game) {
     spacing: unit * 0.006,
     alpha: 0.55 + 0.45 * Math.sin(time * 3.4),
   });
+}
+
+/**
+ * What to print under the final score.
+ *
+ * The best outcome is a new record. Failing that, placing on the board is still
+ * worth celebrating quietly. Failing that, the player is told the number to
+ * beat rather than simply that they lost — a target reads as an invitation, a
+ * bare "BEST 24000" reads as a verdict.
+ */
+export function rankSubtitle(game) {
+  const { newRecord, lastRank, highScore, board } = game;
+
+  if (newRecord) return { text: 'NEW RECORD', celebrate: true };
+  if (lastRank > 0) return { text: `RANK ${lastRank} OF ${board.length}`, celebrate: true };
+
+  // Only meaningful once the board is full — until then any score gets in, so
+  // naming a target would be inventing a barrier that does not exist.
+  const cutoff = cutoffScore(board);
+  if (cutoff > 0) return { text: `${cutoff} TO REACH THE BOARD`, celebrate: false };
+
+  return { text: `BEST ${highScore}`, celebrate: false };
 }
 
 /**
