@@ -25,7 +25,28 @@ Yükleme dosyası her portalda aynı: `dist/deflect-playables.zip`.
 
 ## Öncelik sırası
 
-### 1. CrazyGames — en pratik başlangıç
+### 1. CrazyGames — GÖNDERİLDİ (31 Temmuz 2026)
+
+**Durum: AWAITING REVIEW.** Build ID `973640fb-8c97-4b4b-9444-0d1679b53302`,
+kategori Arcade, Basic Launch (SDK'sız). CrazyGames'in kendi QA ortamında oyun
+çalıştırıldı ve doğrulandı; portal toplam boyutu 0,1 MB olarak raporladı.
+
+Süreçte öğrenilenler:
+
+- **ZIP kabul edilmiyor.** "Archive files are not supported" — dosyalar arşivsiz,
+  doğrudan sürükle-bırak ile yükleniyor. `index.html` en üst düzeyde olmalı,
+  klasörün kendisi değil içindekiler seçilmeli.
+- **5 medya zorunlu:** kapak görselleri 1920×1080, 800×1200, 800×800 ve iki tanıtım
+  videosu (yatay + dikey). Videolar **en fazla 20 saniye**.
+- Progress save sorusunda doğru yanıt "Yes, using LocalStorage" — oyun yüksek skoru
+  orada tutuyor ve portal bunu kullanıcı hesabıyla eşitleyebiliyor.
+
+Sonraki sürüm için not: portal ortamında oyun iframe içinde çalışıyor ve odak
+kolayca kayıyor. `main.js` içindeki `blur` dinleyicisi her odak kaybında oyunu
+duraklatıyor; `visibilitychange` zaten sekme değişimini yakaladığı için `blur`
+dinleyicisi kaldırılabilir. Portal deneyimini yumuşatır.
+
+### 1b. CrazyGames — süreç referansı
 
 **Neden ilk:** SDK entegrasyonu **Basic Launch için opsiyonel** (yalnızca tam reklam
 geliri için zorunlu). Yani oyunu bugünkü haliyle gönderebilirsin. Münhasırlık
