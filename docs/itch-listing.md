@@ -70,10 +70,18 @@ Source code: https://github.com/imaradanisaksaray-netizen/deflect
 
 ## Uploads
 
-`dist/deflect-playables.zip` dosyasını yükle.
+✅ **Yapıldı** — build butler ile yüklendi (kanal `html`, build #1846225).
 
-**Yükleme bitince dosyanın altındaki `This file will be played in the browser`
-kutusunu işaretle.** İşaretlenmezse oyun oynanmaz, indirilir. En sık yapılan hata bu.
+Kanal adı `html` olduğu için itch.io bunu otomatik olarak
+`This file will be played in the browser` diye işaretler. Yine de sayfada
+gözle doğrula: işaretli değilse oyun oynanmaz, indirilir.
+
+Yeni sürüm yüklemek için:
+
+```bash
+node tools/build-zip.mjs
+butler push dist/deflect-playables.zip acubegame/deflect:html
+```
 
 ## Embed options
 
@@ -118,15 +126,15 @@ Yayınladıktan sonra adresi bana ver; README'ye ve YouTube planına ekleyeyim.
 
 ---
 
-## Sonraki sürümleri otomatik yüklemek
+## Sonraki sürümler
 
-Proje bir kez oluşturulduktan sonra, itch.io'nun resmi aracı `butler` ile yeni
-sürümler tek komutla yüklenebilir — tarayıcı ve Cloudflare devreye girmez:
+butler kurulu ve yetkilendirilmiş. Kod değişikliğinden sonra:
 
 ```bash
-butler push dist/deflect-playables.zip imaradanisaksaray-netizen/deflect:html
+node --test tests/logic.test.mjs
+node tools/build-zip.mjs
+butler push dist/deflect-playables.zip acubegame/deflect:html
 ```
 
-Kurulum: [itch.io/docs/butler](https://itch.io/docs/butler). Bir kez
-`butler login` yaparsın (tarayıcıda yetkilendirme, parola girilmez), sonrasında
-push komutunu ben de çalıştırabilirim.
+Tarayıcı ve Cloudflare devreye girmez, sayfa ayarları korunur. Sürüm numarası
+her push'ta otomatik artar.
