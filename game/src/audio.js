@@ -56,6 +56,22 @@ export function toggleMute() {
 }
 
 /**
+ * Silences the game for the duration of an ad, without touching the player's
+ * own mute preference — an ad must never leave the sound toggle in a state the
+ * player did not choose.
+ *
+ * Every portal requires this: two audio sources playing at once is the fastest
+ * way to fail a store review.
+ */
+export function suspendAudio() {
+  if (context && context.state === 'running') context.suspend();
+}
+
+export function resumeAudio() {
+  if (context && context.state === 'suspended') context.resume();
+}
+
+/**
  * Plays a single shaped tone.
  * `glideTo` sweeps the frequency across the note, which is what gives the
  * blips their arcade character.
@@ -116,6 +132,34 @@ export function playBlock(comboStep) {
   const step = clamp(comboStep, 0, 12);
   const base = 320 * 1.0595 ** (step * 2);
   tone({ freq: base, glideTo: base * 1.6, type: 'square', duration: 0.09, gain: 0.16 });
+}
+
+/**
+ * Armoured shell breaking: a short metallic tick, deliberately unlike the block
+ * blip so the player hears "not done yet" rather than "destroyed".
+ */
+export function playShellCrack() {
+  tone({ freq: 1400, glideTo: 700, type: 'square', duration: 0.05, gain: 0.12 });
+  noise({ duration: 0.12, gain: 0.14, frequency: 2600, q: 2.4 });
+}
+
+/** A mimic dropping its disguise — a short downward warning. */
+export function playReveal() {
+  tone({ freq: 900, glideTo: 220, type: 'sawtooth', duration: 0.18, gain: 0.16 });
+}
+
+/**
+ * Catching a reward — a rising four-note figure.
+ *
+ * Everything else in the game falls in pitch or stays flat, so an unmistakable
+ * climb tells the player something good happened without them looking away from
+ * the shards still on screen.
+ */
+export function playPickup() {
+  const steps = [523, 659, 784, 1047];
+  steps.forEach((freq, i) => {
+    tone({ freq, type: 'triangle', duration: 0.14, gain: 0.17, delay: i * 0.055 });
+  });
 }
 
 export function playGold() {

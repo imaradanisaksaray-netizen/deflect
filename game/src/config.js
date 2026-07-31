@@ -50,6 +50,8 @@ export const CONFIG = {
     voidGraceTime: 14,
     voidChanceEnd: 0.28,
     goldChance: 0.09,
+    /** Share of spawns that use an unlocked advanced type, at full ramp. */
+    advancedChanceEnd: 0.3,
     /** Late-game chance of spawning two shards at once. */
     burstChanceEnd: 0.34,
     /**
@@ -80,6 +82,30 @@ export const CONFIG = {
     burstChanceCap: 0.6,
   },
 
+  /**
+   * Pickups: the only thing in the game that rewards catching something other
+   * than a shard. They are deliberately rare — frequent relief would flatten the
+   * difficulty curve the endless ramp exists to create.
+   */
+  pickups: {
+    /** No pickup can appear before this many seconds into a run. */
+    graceTime: 26,
+    /** Average seconds between pickups, and the jitter around that. */
+    interval: 24,
+    intervalJitter: 9,
+    /** Travel speed, in units/second. Slower than any shard so it is catchable. */
+    speed: 0.26,
+    radius: 0.03,
+    /** Only one can be in flight at a time. */
+    maxActive: 1,
+    /** Core repairs stop mattering past this many lives. */
+    maxLives: 5,
+    /** Arc multiplier while WIDE GUARD is active. */
+    extendScale: 1.7,
+    /** Time multiplier while SLIPSTREAM is active. */
+    slowFactor: 0.45,
+  },
+
   feel: {
     telegraphTime: 0.45,
     hitStopDuration: 0.09,
@@ -91,49 +117,165 @@ export const CONFIG = {
     maxDeltaTime: 1 / 20,
   },
 
-  colors: {
-    background: '#07031a',
-    backgroundGlow: '#1b0a44',
-    horizon: '#ff2d95',
-    grid: '#6a2bd9',
-    star: '#c9b8ff',
-    core: '#00f0ff',
-    coreShell: '#7df9ff',
-    shield: '#00f0ff',
-    shieldEdge: '#ffffff',
-    shard: '#22e8ff',
-    gold: '#ffd24a',
-    void: '#ff1f4b',
-    text: '#eae4ff',
-    textDim: '#8f81c6',
-    danger: '#ff1f4b',
-  },
 };
 
-/** Projectile archetypes. Shape differs per type so colour is never the only cue. */
+/**
+ * Projectile archetypes.
+ *
+ * Shape differs per type so colour is never the only cue — that matters for
+ * colour-blind players and it is what lets themes repaint the game freely.
+ * `colorKey` is resolved against the active theme at draw time instead of
+ * baking a hex value in here.
+ */
 export const SHARD_TYPES = {
   shard: {
     key: 'shard',
-    color: CONFIG.colors.shard,
+    colorKey: 'shard',
     shape: 'circle',
     speedScale: 1,
     score: CONFIG.play.scorePerBlock,
     blockable: true,
+    unlockAtSeconds: 0,
   },
   gold: {
     key: 'gold',
-    color: CONFIG.colors.gold,
+    colorKey: 'gold',
     shape: 'diamond',
     speedScale: 1.35,
     score: CONFIG.play.scorePerGold,
     blockable: true,
+    unlockAtSeconds: 0,
   },
   void: {
     key: 'void',
-    color: CONFIG.colors.void,
+    colorKey: 'void',
     shape: 'spike',
     speedScale: 0.86,
     score: 0,
     blockable: false,
+    unlockAtSeconds: 0,
+  },
+
+  /** Blocking it releases two smaller fragments that must also be caught. */
+  splitter: {
+    key: 'splitter',
+    colorKey: 'shard',
+    shape: 'ringed',
+    speedScale: 0.82,
+    score: 15,
+    blockable: true,
+    unlockAtSeconds: 600,
+    label: 'SPLITTER',
+    hint: 'IT BREAKS IN TWO',
+    splitInto: 2,
+    /** Fragment offset from the parent bearing, in radians. */
+    splitSpread: 0.34,
+  },
+
+  /** Needs two hits: the first cracks the shell, the second destroys it. */
+  shelled: {
+    key: 'shelled',
+    colorKey: 'shard',
+    shape: 'shelled',
+    speedScale: 0.72,
+    score: 30,
+    blockable: true,
+    unlockAtSeconds: 1500,
+    label: 'ARMOURED',
+    hint: 'HIT IT TWICE',
+    hitPoints: 2,
+    /** How far the shard is pushed back when its shell breaks, in units. */
+    knockback: 0.16,
+  },
+
+  /**
+   * Looks like an ordinary shard until it nears the shield, then reveals itself
+   * as a spike. Reveal timing is enforced in projectiles.js so the player always
+   * gets a fair window to pull away.
+   */
+  mimic: {
+    key: 'mimic',
+    colorKey: 'shard',
+    shape: 'circle',
+    speedScale: 0.9,
+    score: 0,
+    blockable: true,
+    unlockAtSeconds: 2700,
+    label: 'MIMIC',
+    hint: 'NOT EVERYTHING IS WHAT IT SEEMS',
+    revealsAsVoid: true,
+    /**
+     * Fraction of the approach the player still has left when the disguise
+     * drops. Expressed as a share of the flight rather than a fixed number of
+     * seconds: at OVERDRIVE speeds the whole approach lasts well under a second,
+     * so any constant lead time would either be impossible to honour or would
+     * reveal the mimic the instant it spawns.
+     */
+    revealAtFraction: 0.45,
+  },
+
+  /** Arrives as a tight burst from one bearing; hold the shield still. */
+  swarm: {
+    key: 'swarm',
+    colorKey: 'shard',
+    shape: 'circle',
+    speedScale: 1.1,
+    score: 6,
+    blockable: true,
+    unlockAtSeconds: 4200,
+    label: 'SWARM',
+    hint: 'HOLD YOUR GROUND',
+    sizeScale: 0.62,
+    burstSize: 4,
+    /** Gap between swarm members, in units of travel distance. */
+    burstGap: 0.07,
   },
 };
+
+/**
+ * Pickup archetypes.
+ *
+ * All of them share one colour — the theme's `pickup` — because colour answers
+ * the only question that matters mid-run: catch it, or stay away? The symbol
+ * says *which* reward it is, and that can be read at leisure.
+ */
+export const PICKUP_TYPES = {
+  /** Restores one core segment. Never spawns at full health. */
+  life: {
+    key: 'life',
+    symbol: 'cross',
+    weight: 1,
+    label: 'CORE REPAIR',
+  },
+  /** Widens the shield arc for a while. */
+  extend: {
+    key: 'extend',
+    symbol: 'arc',
+    weight: 1.2,
+    duration: 9,
+    label: 'WIDE GUARD',
+  },
+  /** Slows the whole run down — including the clock, so safety costs score. */
+  slow: {
+    key: 'slow',
+    symbol: 'hourglass',
+    weight: 1.2,
+    duration: 6,
+    label: 'SLIPSTREAM',
+  },
+  /** Clears every blockable shard on screen and pays for each one. */
+  nova: {
+    key: 'nova',
+    symbol: 'burst',
+    weight: 0.9,
+    label: 'NOVA',
+  },
+};
+
+export const PICKUP_KEYS = Object.keys(PICKUP_TYPES);
+
+/** Types that exist from the very first run. */
+export const BASE_TYPES = ['shard', 'gold', 'void'];
+
+/** Types that unlock as total play time accumulates. */
+export const ADVANCED_TYPES = ['splitter', 'shelled', 'mimic', 'swarm'];

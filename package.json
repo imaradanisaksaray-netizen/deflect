@@ -1,0 +1,24 @@
+{
+  "name": "deflect",
+  "version": "2.0.0",
+  "private": true,
+  "description": "DEFLECT — a neon reflex arcade game. Block the light, dodge the void.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "serve": "node tools/serve.mjs",
+    "build:zip": "node tools/build-zip.mjs",
+    "build:portal": "node tools/build-portal.mjs",
+    "build:icons": "node tools/build-icons.mjs",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:build": "cd android && gradlew.bat assembleDebug",
+    "android:bundle": "cd android && gradlew.bat bundleRelease"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor-community/admob": "^7.0.0"
+  }
+}

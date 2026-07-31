@@ -1,12 +1,14 @@
 /**
- * High score persistence.
+ * Sound preference persistence.
  *
  * Storage is wrapped in try/catch on purpose: embedded contexts (YouTube
  * Playables, itch.io iframes, private browsing) can throw on access. A missing
- * high score must never break the game.
+ * preference must never break the game.
+ *
+ * Progress and high score moved to progress/profile.js in v2; this file now
+ * only owns the mute flag.
  */
 
-const HIGH_SCORE_KEY = 'deflect.highScore.v1';
 const MUTED_KEY = 'deflect.muted.v1';
 
 function readNumber(key, fallback) {
@@ -27,10 +29,6 @@ function write(key, value) {
     // Storage unavailable — the session simply keeps its value in memory.
   }
 }
-
-export const readHighScore = () => readNumber(HIGH_SCORE_KEY, 0);
-
-export const writeHighScore = (score) => write(HIGH_SCORE_KEY, Math.floor(score));
 
 export const readMuted = () => readNumber(MUTED_KEY, 0) === 1;
 

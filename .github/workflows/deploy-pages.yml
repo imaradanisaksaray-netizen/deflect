@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '22'
       - name: Run logic tests
-        run: node --test tests/logic.test.mjs
+        run: node --test tests/*.test.mjs
 
   deploy:
     # A broken build must never reach the live URL.

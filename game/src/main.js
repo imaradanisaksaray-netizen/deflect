@@ -4,9 +4,25 @@
 
 import { CONFIG } from './config.js';
 import { toggleMute, unlockAudio } from './audio.js';
+import { createProjectile } from './entities/projectiles.js';
+import { createPickup } from './systems/pickups.js';
+import * as adProvider from './ads/provider.js';
+import { bindNativeShell, initNativeAds } from './native.js';
+import * as menu from './ui/menu.js';
 import { createInput } from './input.js';
 import { createRenderer, render } from './render/renderer.js';
-import { createGame, handleAction, pauseIfPlaying, togglePause, updateGame } from './state/game.js';
+import {
+  applyTheme,
+  createGame,
+  handleAction,
+  navigateBack,
+  navigateMenu,
+  openThemePicker,
+  pauseIfPlaying,
+  togglePause,
+  updateGame,
+} from './state/game.js';
+import { THEMES } from './themes/index.js';
 import { createViewport, resizeViewport } from './viewport.js';
 
 const canvas = document.getElementById('stage');
@@ -23,10 +39,21 @@ const input = createInput(canvas, viewport, {
   },
   onPause: () => togglePause(game),
   onMute: () => toggleMute(),
+  onCycleTheme: () => openThemePicker(game),
+  onNavigate: (direction) => navigateMenu(game, direction),
 });
 
 const game = createGame(viewport, input.state);
-const renderer = createRenderer(ctx, viewport);
+const renderer = createRenderer(ctx, viewport, game.theme);
+
+// No-ops on the web. On Android these are the difference between a game and a
+// web page in a box: the back button goes up a level instead of closing the
+// app, and losing focus pauses the run.
+initNativeAds();
+bindNativeShell({
+  onBack: () => navigateBack(game),
+  onPause: () => pauseIfPlaying(game),
+});
 
 function applyResize() {
   resizeViewport(viewport, canvas, ctx);
@@ -48,9 +75,12 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('blur', () => pauseIfPlaying(game));
 
-// Exposed so automated play-testing can drive a run and read the outcome.
-// Read-mostly game state; nothing here changes how the game plays.
-window.__deflect = { game, viewport };
+// Exposed so automated play-testing can drive a run, switch themes and read the
+// outcome. Read-mostly game state; nothing here changes how the game plays.
+window.__deflect = {
+  game, viewport, applyTheme, themes: THEMES, createProjectile, createPickup, menu,
+  adProvider,
+};
 
 let lastFrameTime = performance.now();
 

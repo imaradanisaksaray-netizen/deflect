@@ -7,23 +7,38 @@
 
 import { CONFIG } from '../config.js';
 import { clamp, rand } from '../math.js';
-import { SCREEN } from '../state/game.js';
+import { SCREEN, isMenuScreen } from '../state/game.js';
 import { createBackground, drawBackground, updateBackground } from './background.js';
-import { drawCore, drawProjectiles, drawShield } from './entities.js';
+import { drawCore, drawPickups, drawProjectiles, drawShield } from './entities.js';
 import { drawEffects } from './effects.js';
 import { drawGameOver, drawHud, drawMenu, drawPaused } from './hud.js';
+import {
+  drawHelpScreen,
+  drawScoresScreen,
+  drawStatsScreen,
+  drawThemeScreen,
+} from './screens.js';
 
-export function createRenderer(ctx, viewport) {
-  return { ctx, viewport, background: createBackground() };
+export function createRenderer(ctx, viewport, theme) {
+  return { ctx, viewport, background: createBackground(theme), themeId: theme.id };
 }
 
 export function render(renderer, game, dt) {
   const { ctx, viewport } = renderer;
+  const { theme } = game;
+
+  // Star density and particle physics are baked in at creation, so a theme
+  // switch needs a fresh backdrop rather than a palette swap.
+  if (renderer.themeId !== theme.id) {
+    renderer.background = createBackground(theme);
+    renderer.themeId = theme.id;
+  }
+
   const energy = computeEnergy(game);
   const danger = computeDanger(game);
 
-  updateBackground(renderer.background, dt, energy);
-  drawBackground(ctx, renderer.background, viewport, { time: game.time, energy, danger });
+  updateBackground(renderer.background, dt, energy, theme);
+  drawBackground(ctx, renderer.background, viewport, { time: game.time, energy, danger, theme });
 
   const shake = game.reducedMotion ? 0 : game.shake * viewport.unit;
   ctx.save();
@@ -37,6 +52,7 @@ export function render(renderer, game, dt) {
   }
 
   drawProjectiles(ctx, game);
+  drawPickups(ctx, game);
   drawShield(ctx, game);
   drawCore(ctx, game);
   drawEffects(ctx, game.effects);
@@ -45,13 +61,17 @@ export function render(renderer, game, dt) {
   drawHud(ctx, game);
 
   if (game.screen === SCREEN.menu) drawMenu(ctx, game);
+  else if (game.screen === SCREEN.themes) drawThemeScreen(ctx, game);
+  else if (game.screen === SCREEN.scores) drawScoresScreen(ctx, game);
+  else if (game.screen === SCREEN.stats) drawStatsScreen(ctx, game);
+  else if (game.screen === SCREEN.help) drawHelpScreen(ctx, game);
   else if (game.screen === SCREEN.paused) drawPaused(ctx, game);
   else if (game.screen === SCREEN.gameover) drawGameOver(ctx, game);
 }
 
 /** Drives how fast and bright the backdrop reacts. */
 function computeEnergy(game) {
-  if (game.screen === SCREEN.menu) return 0.15;
+  if (isMenuScreen(game.screen)) return 0.15;
 
   const comboEnergy = clamp((game.multiplier - 1) / (CONFIG.play.maxMultiplier - 1), 0, 1);
   // Overtime keeps feeding the backdrop after the ramp tops out, so the screen

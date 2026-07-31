@@ -22,14 +22,20 @@ export function createInput(canvas, viewport, handlers = {}) {
     pointerAngle: -Math.PI / 2,
     hasPointer: false,
     turn: 0,
+    /** Canvas-local pointer position. Menus hit-test against this. */
+    pointerX: 0,
+    pointerY: 0,
   };
 
   const heldKeys = new Set();
 
   const aimAt = (clientX, clientY) => {
     const bounds = canvas.getBoundingClientRect();
-    const x = clientX - bounds.left - viewport.centerX;
-    const y = clientY - bounds.top - viewport.centerY;
+    state.pointerX = clientX - bounds.left;
+    state.pointerY = clientY - bounds.top;
+
+    const x = state.pointerX - viewport.centerX;
+    const y = state.pointerY - viewport.centerY;
     // Ignore jitter right on the centre point, where the angle is meaningless.
     if (Math.hypot(x, y) < viewport.unit * CONFIG.world.coreRadius * 0.35) return;
 
@@ -66,6 +72,9 @@ export function createInput(canvas, viewport, handlers = {}) {
       heldKeys.add(event.code);
       state.mode = 'keyboard';
       updateTurn();
+      // The same keys steer the shield in a run and move between menu entries.
+      // Which one applies is the game's call, not this module's.
+      handlers.onNavigate?.(TURN_RIGHT_KEYS.has(event.code) ? 1 : -1);
       event.preventDefault();
       return;
     }
@@ -81,6 +90,11 @@ export function createInput(canvas, viewport, handlers = {}) {
     }
     if (event.code === 'KeyM') {
       handlers.onMute?.();
+      event.preventDefault();
+      return;
+    }
+    if (event.code === 'KeyT') {
+      handlers.onCycleTheme?.();
       event.preventDefault();
     }
   };

@@ -9,6 +9,12 @@ import { angleDelta, damp, normalizeAngle } from '../math.js';
 export function createShield() {
   return {
     angle: -Math.PI / 2,
+    /**
+     * Current arc width in radians. Normally the configured span, eased wider
+     * while a WIDE GUARD pickup is active — it is state, not a constant, so
+     * collision and rendering agree on the same number every frame.
+     */
+    arcSpan: CONFIG.shield.arcSpan,
     /** Decays after every successful block; drives the impact flash. */
     flash: 0,
     /** Radial recoil in units, pushed outward on impact. */
@@ -41,7 +47,19 @@ export function updateShield(shield, input, dt, idleSpin = 0) {
 
 /** True when `angle` falls inside the shield arc. */
 export function shieldCovers(shield, angle) {
-  return Math.abs(angleDelta(shield.angle, angle)) <= CONFIG.shield.arcSpan / 2;
+  const span = shield.arcSpan ?? CONFIG.shield.arcSpan;
+  return Math.abs(angleDelta(shield.angle, angle)) <= span / 2;
+}
+
+/**
+ * Eases the arc toward its target width.
+ *
+ * Snapping would let a pickup block something that was already past the old
+ * edge, which reads as the game cheating in the player's favour — and the same
+ * snap on expiry would read as it cheating against them.
+ */
+export function setShieldSpan(shield, targetSpan, dt) {
+  shield.arcSpan = damp(shield.arcSpan, targetSpan, 9, dt);
 }
 
 export function registerImpact(shield, strength = 1) {

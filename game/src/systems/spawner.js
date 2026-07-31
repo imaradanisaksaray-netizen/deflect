@@ -1,14 +1,17 @@
 /**
  * Shard spawning.
  *
- * The fairness check is the important part: a shard is never placed where the
- * player physically cannot reach it in time, because a run that ends on an
- * impossible pattern feels broken rather than hard.
+ * Two rules govern everything here:
+ *   1. Fairness — a shard is never placed where the player physically cannot
+ *      reach it in time. A run that ends on an impossible pattern feels broken
+ *      rather than hard.
+ *   2. Familiarity — advanced threats stay rare early in a run even after they
+ *      unlock, so the first minute always plays like the game already learned.
  */
 
-import { CONFIG, SHARD_TYPES } from '../config.js';
-import { createProjectile, timeToRadius } from '../entities/projectiles.js';
-import { angleDelta, chance, rand } from '../math.js';
+import { ADVANCED_TYPES, CONFIG, SHARD_TYPES } from '../config.js';
+import { createProjectile, isBlockable, timeToRadius } from '../entities/projectiles.js';
+import { angleDelta, chance, pick, rand } from '../math.js';
 
 /**
  * Fairness limits, exported so the tests assert against the real numbers
@@ -40,24 +43,52 @@ export function updateSpawner(spawner, state, difficulty, dt) {
 }
 
 function spawnShard(state, difficulty, companionAngle) {
-  const type = rollType(difficulty);
+  const type = rollType(difficulty, state.availableTypes);
+  const archetype = SHARD_TYPES[type];
   const distance = state.viewport.cornerDistance + CONFIG.world.spawnMargin;
-  // Each archetype flies at its own multiple of the base speed, so the arrival
-  // time used for the fairness check must include that multiplier. Using the
-  // base speed here made "do these arrive together?" answer for a shard that
-  // does not exist, and let genuinely unreachable pairs through.
-  const effectiveSpeed = difficulty.speed * SHARD_TYPES[type].speedScale;
+  const baseSpeed = difficulty.speed;
+  // The fairness check needs the shard's real speed, which includes its
+  // archetype multiplier — otherwise "do these arrive together?" is answered
+  // for a shard that does not exist.
+  const effectiveSpeed = baseSpeed * archetype.speedScale;
   const angle = placeAngle(state, distance, effectiveSpeed, companionAngle);
 
   // No fair placement this tick. Dropping the shard is strictly better than
   // spawning one the player cannot reach; the next tick tries again.
   if (angle === null) return;
 
-  state.projectiles.push(createProjectile({ type, angle, distance, speed: difficulty.speed }));
+  if (archetype.burstSize) {
+    spawnSwarm(state, type, archetype, angle, distance, baseSpeed);
+    return;
+  }
+
+  state.projectiles.push(createProjectile({ type, angle, distance, speed: baseSpeed }));
 }
 
-function rollType(difficulty) {
-  if (chance(difficulty.voidChance)) return 'void';
+/**
+ * A swarm arrives as a tight line from one bearing. Members are staggered by
+ * distance rather than by time so they stay on the same line no matter what the
+ * spawn interval is doing.
+ */
+function spawnSwarm(state, type, archetype, angle, distance, baseSpeed) {
+  for (let i = 0; i < archetype.burstSize; i += 1) {
+    state.projectiles.push(createProjectile({
+      type,
+      angle,
+      distance: distance + i * archetype.burstGap,
+      speed: baseSpeed,
+    }));
+  }
+}
+
+function rollType(difficulty, availableTypes) {
+  const available = availableTypes ?? ['shard', 'gold', 'void'];
+
+  if (available.includes('void') && chance(difficulty.voidChance)) return 'void';
+
+  const advanced = ADVANCED_TYPES.filter((key) => available.includes(key));
+  if (advanced.length && chance(difficulty.advancedChance)) return pick(advanced);
+
   if (chance(CONFIG.difficulty.goldChance)) return 'gold';
   return 'shard';
 }
@@ -89,8 +120,10 @@ function isReachable(projectiles, angle, arrival, shieldRadius) {
   for (const projectile of projectiles) {
     const otherArrival = timeToRadius(projectile, shieldRadius);
     if (Math.abs(otherArrival - arrival) > FAIRNESS.simultaneousWindow) continue;
-    // A void shard is dodged, not blocked, so it never creates an impossible pair.
-    if (!projectile.archetype.blockable) continue;
+    // A spike is dodged, not blocked, so it never creates an impossible pair.
+    // A disguised mimic still counts as blockable — the player will treat it as
+    // one until it reveals, so it has to be reachable like any other shard.
+    if (!isBlockable(projectile)) continue;
     if (Math.abs(angleDelta(projectile.angle, angle)) > FAIRNESS.unreachableGap) return false;
   }
   return true;
