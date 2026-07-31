@@ -1,6 +1,7 @@
 # DEFLECT — Neon Reflex Arcade
 
-**▶ Oyna: https://imaradanisaksaray-netizen.github.io/deflect/**
+**▶ Oyna:** [itch.io](https://acubegame.itch.io/deflect) ·
+[GitHub Pages](https://imaradanisaksaray-netizen.github.io/deflect/)
 
 Tarayıcıda çalışan, bağımlılığı olmayan hyper-casual refleks oyunu. YouTube Playables'ın
 teknik kurallarına uygun yazıldı: saf HTML5, tek klasör, her ekran oranında oynanabilir,

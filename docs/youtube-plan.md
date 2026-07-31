@@ -112,11 +112,21 @@ oyun o oranda da sorunsuz çalışır.
 
 ## 5. Sıradaki adımlar
 
-1. `game/` klasörünü GitHub Pages veya itch.io'ya yayınla, canlı URL al
-2. Playables ilgi formunu bu URL ile doldur
+Oyun iki kanalda da yayında:
+
+| Kanal | Adres | Durum |
+|-------|-------|-------|
+| itch.io | https://acubegame.itch.io/deflect | Yayında, sayfa alanları eksik |
+| GitHub Pages | https://imaradanisaksaray-netizen.github.io/deflect/ | Yayında, her push'ta otomatik güncelleniyor |
+
+Kalan işler:
+
+1. itch.io sayfasını tamamla — kapak görseli, etiketler, açıklama
+   ([itch-listing.md](itch-listing.md) içinde hazır metinler)
+2. Playables ilgi formunu GitHub Pages adresiyle doldur
 3. Kanalı aç, adı ve görsel kimliği oyunla aynı olsun (neon/synthwave)
 4. İlk 5 Short'u tek oturumda kaydedip programa bağla
-5. Onay gelirse `dist/deflect-playables.zip` dosyasını portala yükle
+5. Playables onayı gelirse `dist/deflect-playables.zip` dosyasını portala yükle
 
 ## Kaynaklar
 
