@@ -7,11 +7,12 @@
 
 import { CONFIG } from '../config.js';
 import { clamp, rand } from '../math.js';
-import { SCREEN } from '../state/game.js';
+import { SCREEN, isMenuScreen } from '../state/game.js';
 import { createBackground, drawBackground, updateBackground } from './background.js';
 import { drawCore, drawPickups, drawProjectiles, drawShield } from './entities.js';
 import { drawEffects } from './effects.js';
 import { drawGameOver, drawHud, drawMenu, drawPaused } from './hud.js';
+import { drawHelpScreen, drawStatsScreen, drawThemeScreen } from './screens.js';
 
 export function createRenderer(ctx, viewport, theme) {
   return { ctx, viewport, background: createBackground(theme), themeId: theme.id };
@@ -55,13 +56,16 @@ export function render(renderer, game, dt) {
   drawHud(ctx, game);
 
   if (game.screen === SCREEN.menu) drawMenu(ctx, game);
+  else if (game.screen === SCREEN.themes) drawThemeScreen(ctx, game);
+  else if (game.screen === SCREEN.stats) drawStatsScreen(ctx, game);
+  else if (game.screen === SCREEN.help) drawHelpScreen(ctx, game);
   else if (game.screen === SCREEN.paused) drawPaused(ctx, game);
   else if (game.screen === SCREEN.gameover) drawGameOver(ctx, game);
 }
 
 /** Drives how fast and bright the backdrop reacts. */
 function computeEnergy(game) {
-  if (game.screen === SCREEN.menu) return 0.15;
+  if (isMenuScreen(game.screen)) return 0.15;
 
   const comboEnergy = clamp((game.multiplier - 1) / (CONFIG.play.maxMultiplier - 1), 0, 1);
   // Overtime keeps feeding the backdrop after the ramp tops out, so the screen

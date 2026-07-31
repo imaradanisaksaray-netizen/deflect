@@ -6,10 +6,20 @@ import { CONFIG } from './config.js';
 import { toggleMute, unlockAudio } from './audio.js';
 import { createProjectile } from './entities/projectiles.js';
 import { createPickup } from './systems/pickups.js';
+import * as menu from './ui/menu.js';
 import { createInput } from './input.js';
 import { createRenderer, render } from './render/renderer.js';
-import { applyTheme, createGame, handleAction, pauseIfPlaying, togglePause, updateGame } from './state/game.js';
-import { THEMES, unlockedThemes } from './themes/index.js';
+import {
+  applyTheme,
+  createGame,
+  handleAction,
+  navigateMenu,
+  openThemePicker,
+  pauseIfPlaying,
+  togglePause,
+  updateGame,
+} from './state/game.js';
+import { THEMES } from './themes/index.js';
 import { createViewport, resizeViewport } from './viewport.js';
 
 const canvas = document.getElementById('stage');
@@ -26,18 +36,9 @@ const input = createInput(canvas, viewport, {
   },
   onPause: () => togglePause(game),
   onMute: () => toggleMute(),
-  onCycleTheme: () => cycleTheme(),
+  onCycleTheme: () => openThemePicker(game),
+  onNavigate: (direction) => navigateMenu(game, direction),
 });
-
-/** Steps through the themes the player has actually unlocked. */
-function cycleTheme() {
-  const available = unlockedThemes(game.profile);
-  if (available.length < 2) return;
-
-  const current = available.findIndex((theme) => theme.id === game.theme.id);
-  const next = available[(current + 1) % available.length];
-  applyTheme(game, next.id);
-}
 
 const game = createGame(viewport, input.state);
 const renderer = createRenderer(ctx, viewport, game.theme);
@@ -64,7 +65,9 @@ window.addEventListener('blur', () => pauseIfPlaying(game));
 
 // Exposed so automated play-testing can drive a run, switch themes and read the
 // outcome. Read-mostly game state; nothing here changes how the game plays.
-window.__deflect = { game, viewport, applyTheme, themes: THEMES, createProjectile, createPickup };
+window.__deflect = {
+  game, viewport, applyTheme, themes: THEMES, createProjectile, createPickup, menu,
+};
 
 let lastFrameTime = performance.now();
 

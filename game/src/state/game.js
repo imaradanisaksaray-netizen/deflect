@@ -31,6 +31,7 @@ import { difficultyAt } from '../systems/difficulty.js';
 import { loadProfile, markUnlocksSeen, recordRun, saveProfile } from '../progress/profile.js';
 import { collectUnlocks, unlockedTypeKeys } from '../progress/unlocks.js';
 import { getTheme } from '../themes/index.js';
+import { backButton, hitTest, tabButtons, themeButtons } from '../ui/menu.js';
 import { toScreenX, toScreenY } from '../viewport.js';
 
 export const SCREEN = {
@@ -38,7 +39,15 @@ export const SCREEN = {
   playing: 'playing',
   paused: 'paused',
   gameover: 'gameover',
+  themes: 'themes',
+  stats: 'stats',
+  help: 'help',
 };
+
+/** Screens that are part of the menu flow rather than a run. */
+const MENU_SCREENS = new Set([SCREEN.menu, SCREEN.themes, SCREEN.stats, SCREEN.help]);
+
+export const isMenuScreen = (screen) => MENU_SCREENS.has(screen);
 
 export function createGame(viewport, input) {
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -58,6 +67,8 @@ export function createGame(viewport, input) {
     /** Shard types the profile has unlocked; the spawner draws from this. */
     availableTypes: unlockedTypeKeys(profile),
     screen: SCREEN.menu,
+    /** Keyboard-selected menu entry; -1 means the pointer is in charge. */
+    menuSelection: -1,
     shield: createShield(),
     projectiles: [],
     /** Rewards currently drifting in. At most one at a time. */
@@ -160,7 +171,11 @@ export function applyTheme(game, themeId) {
 
 /** Primary action: click / tap / Space. Meaning depends on the current screen. */
 export function handleAction(game) {
-  if (game.screen === SCREEN.menu) return startRun(game);
+  if (game.screen === SCREEN.menu) return activateMenu(game);
+  if (game.screen === SCREEN.themes) return activateThemePicker(game);
+  if (game.screen === SCREEN.stats || game.screen === SCREEN.help) {
+    return activateSubScreen(game);
+  }
   if (game.screen === SCREEN.paused) game.screen = SCREEN.playing;
   // A run is only restartable after a short beat, so the death tap never
   // instantly burns the next run.
@@ -168,9 +183,112 @@ export function handleAction(game) {
   return undefined;
 }
 
+/**
+ * The main menu keeps its one-tap promise: anywhere that is not a tab starts a
+ * run. The tabs are small and low precisely so they never get in the way of it.
+ */
+function activateMenu(game) {
+  const tabs = tabButtons(game.viewport);
+  const selected = selectedButton(game, tabs);
+
+  if (selected) {
+    game.screen = selected.id;
+    game.menuSelection = -1;
+    return undefined;
+  }
+
+  return startRun(game);
+}
+
+function activateThemePicker(game) {
+  const buttons = themeButtons(game.viewport, game.profile);
+  const back = backButton(game.viewport);
+
+  if (pointerHit(game, [back])) return goToMenu(game);
+
+  const selected = selectedButton(game, buttons);
+  // A locked theme is not an error to report, it is simply not a choice yet.
+  if (selected?.unlocked) applyTheme(game, selected.theme.id);
+  return undefined;
+}
+
+function activateSubScreen(game) {
+  // Only the back button leaves. A stray tap dropping the player out of a
+  // screen they were reading would feel like the game rejecting them.
+  if (pointerHit(game, [backButton(game.viewport)]) || game.menuSelection >= 0) {
+    return goToMenu(game);
+  }
+  return undefined;
+}
+
+/**
+ * Which button the action applies to.
+ *
+ * Keyboard selection wins when it is active, because a player steering with
+ * arrow keys has no meaningful pointer position — the cursor is wherever they
+ * last left it, possibly over an unrelated button.
+ */
+function selectedButton(game, buttons) {
+  if (game.menuSelection >= 0) return buttons[game.menuSelection] ?? null;
+  return pointerHit(game, buttons);
+}
+
+function pointerHit(game, buttons) {
+  const { input } = game;
+  if (input.mode !== 'pointer') return null;
+  return hitTest(buttons, input.pointerX, input.pointerY);
+}
+
+function goToMenu(game) {
+  game.screen = SCREEN.menu;
+  game.menuSelection = -1;
+  return undefined;
+}
+
+/**
+ * Arrow keys / A-D move between menu entries.
+ *
+ * The same keys steer the shield during a run, which is why this only responds
+ * on menu screens — and why the first press selects the first entry rather than
+ * moving from an invisible default.
+ */
+export function navigateMenu(game, direction) {
+  const buttons = menuButtonsFor(game);
+  if (!buttons.length) return;
+
+  if (game.menuSelection < 0) {
+    game.menuSelection = direction > 0 ? 0 : buttons.length - 1;
+    return;
+  }
+
+  game.menuSelection = (game.menuSelection + direction + buttons.length) % buttons.length;
+}
+
+/** The navigable buttons on the current screen, in order. */
+export function menuButtonsFor(game) {
+  if (game.screen === SCREEN.menu) return tabButtons(game.viewport);
+  if (game.screen === SCREEN.themes) return themeButtons(game.viewport, game.profile);
+  if (game.screen === SCREEN.stats || game.screen === SCREEN.help) {
+    return [backButton(game.viewport)];
+  }
+  return [];
+}
+
 export function togglePause(game) {
+  // On a sub-screen, Escape means "back" — the meaning the player expects from
+  // every other piece of software they have ever used.
+  if (isMenuScreen(game.screen) && game.screen !== SCREEN.menu) return goToMenu(game);
+
   if (game.screen === SCREEN.playing) game.screen = SCREEN.paused;
   else if (game.screen === SCREEN.paused) game.screen = SCREEN.playing;
+  return undefined;
+}
+
+/** Opens the theme picker directly — bound to [T]. */
+export function openThemePicker(game) {
+  if (!isMenuScreen(game.screen)) return;
+  game.screen = game.screen === SCREEN.themes ? SCREEN.menu : SCREEN.themes;
+  game.menuSelection = -1;
 }
 
 export function pauseIfPlaying(game) {
@@ -187,8 +305,12 @@ export function updateGame(game, dt) {
   game.shake = damp(game.shake, 0, CONFIG.feel.shakeDecay, dt);
   game.coreFlash = Math.max(0, game.coreFlash - dt * 2.6);
 
+  // Touching the mouse hands control back to it, so a stale keyboard highlight
+  // never sits on a button the player is no longer looking at.
+  if (game.input.mode === 'pointer' && game.menuSelection >= 0) game.menuSelection = -1;
+
   // The shield keeps tracking on every screen so the game always feels alive.
-  updateShield(game.shield, game.input, dt, game.screen === SCREEN.menu ? 0.5 : 0);
+  updateShield(game.shield, game.input, dt, isMenuScreen(game.screen) ? 0.5 : 0);
   setShieldSpan(
     game.shield,
     CONFIG.shield.arcSpan * (game.buffs.extend > 0 ? CONFIG.pickups.extendScale : 1),

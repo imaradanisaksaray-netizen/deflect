@@ -11,7 +11,9 @@ import { isMuted } from '../audio.js';
 import { clamp, easeOutCubic } from '../math.js';
 import { SCREEN } from '../state/game.js';
 import { nextThemeGoal } from '../progress/unlocks.js';
+import { tabButtons } from '../ui/menu.js';
 import { drawShardIcon } from './entities.js';
+import { drawButton } from './screens.js';
 import { neonText, plainText, withAlpha } from './neon.js';
 
 const HOW_TO_PLAY = [
@@ -242,19 +244,32 @@ export function drawMenu(ctx, game) {
   drawHowToPlay(ctx, viewport, time, theme);
 
   const pulse = 0.6 + 0.4 * Math.sin(time * 3);
-  plainText(ctx, 'CLICK  /  TAP  /  SPACE  TO  START', width / 2, height * 0.875, {
+  plainText(ctx, 'CLICK  /  TAP  /  SPACE  TO  START', width / 2, height * 0.855, {
     size: unit * 0.032,
     color: theme.colors.text,
     spacing: unit * 0.006,
     alpha: pulse,
   });
 
-  plainText(ctx, 'AIM WITH MOUSE, TOUCH OR ARROW KEYS', width / 2, height * 0.945, {
-    size: unit * 0.022,
-    color: theme.colors.textDim,
-    spacing: unit * 0.004,
-    alpha: 0.6,
-  });
+  drawTabs(ctx, game);
+}
+
+/**
+ * The bottom tab strip.
+ *
+ * Deliberately quiet. The menu's promise is that tapping anywhere plays, and
+ * three loud buttons would make the player hunt for the right one instead.
+ */
+function drawTabs(ctx, game) {
+  const buttons = tabButtons(game.viewport);
+  const selectedId = buttons[game.menuSelection]?.id;
+
+  for (const button of buttons) {
+    drawButton(ctx, game, button, {
+      selected: button.id === selectedId,
+      accent: game.theme.colors.textDim,
+    });
+  }
 }
 
 /**
@@ -317,7 +332,9 @@ function drawThemeProgress(ctx, game) {
 
 function drawHowToPlay(ctx, viewport, time, theme) {
   const { width, height, unit } = viewport;
-  const y = height * 0.775;
+  // Sits above the call to action with room to spare. The full explanation now
+  // lives on its own screen; this row is only the three-second version.
+  const y = height * 0.72;
   const spacing = unit * 0.26;
   const iconSize = unit * 0.024;
 

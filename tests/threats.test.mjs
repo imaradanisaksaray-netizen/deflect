@@ -205,7 +205,9 @@ test('a swarm spawns as a group on one bearing', () => {
   // swarm actually appears rather than asserting on a single roll.
   const state = makeState({ availableTypes: ['swarm'] });
   const spawner = createSpawner();
-  const difficulty = difficultyAt(CONFIG.difficulty.rampDuration);
+  // Bursts off: a second shard arriving alongside the swarm would make the
+  // member count depend on an unrelated dice roll.
+  const difficulty = { ...difficultyAt(CONFIG.difficulty.rampDuration), burstChance: 0 };
   let swarm = null;
 
   for (let attempt = 0; attempt < 500 && !swarm; attempt += 1) {

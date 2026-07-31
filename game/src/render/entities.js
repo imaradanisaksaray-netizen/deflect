@@ -387,6 +387,29 @@ function drawTrail(ctx, viewport, projectile, fadeIn, theme) {
 }
 
 /** Small preview shard used by the menu's how-to-play row. */
+/**
+ * Pickup icon for the how-to-play screen.
+ *
+ * Same symbol routine as the in-flight version, so a reward can never be
+ * explained with a picture the game does not actually draw.
+ */
+export function drawPickupIcon(ctx, x, y, size, symbol, theme) {
+  const color = theme.colors.pickup;
+  radialGlow(ctx, x, y, size * 2, color, 0.5);
+
+  ctx.save();
+  ctx.translate(x, y);
+  neonStroke(ctx, (context) => {
+    for (let i = 0; i < 3; i += 1) {
+      const start = (i / 3) * TAU;
+      context.moveTo(Math.cos(start) * size * 1.25, Math.sin(start) * size * 1.25);
+      context.arc(0, 0, size * 1.25, start, start + 0.72);
+    }
+  }, { color, width: size * 0.2, intensity: 0.85, core: false });
+  drawPickupSymbol(ctx, symbol, size, size * 4, color, 1);
+  ctx.restore();
+}
+
 export function drawShardIcon(ctx, x, y, size, typeKey, spin, theme) {
   const archetype = SHARD_TYPES[typeKey];
   const color = theme.colors[archetype.colorKey];
