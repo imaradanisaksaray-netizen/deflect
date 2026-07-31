@@ -91,30 +91,20 @@ export const CONFIG = {
     maxDeltaTime: 1 / 20,
   },
 
-  colors: {
-    background: '#07031a',
-    backgroundGlow: '#1b0a44',
-    horizon: '#ff2d95',
-    grid: '#6a2bd9',
-    star: '#c9b8ff',
-    core: '#00f0ff',
-    coreShell: '#7df9ff',
-    shield: '#00f0ff',
-    shieldEdge: '#ffffff',
-    shard: '#22e8ff',
-    gold: '#ffd24a',
-    void: '#ff1f4b',
-    text: '#eae4ff',
-    textDim: '#8f81c6',
-    danger: '#ff1f4b',
-  },
 };
 
-/** Projectile archetypes. Shape differs per type so colour is never the only cue. */
+/**
+ * Projectile archetypes.
+ *
+ * Shape differs per type so colour is never the only cue — that matters for
+ * colour-blind players and it is what lets themes repaint the game freely.
+ * `colorKey` is resolved against the active theme at draw time instead of
+ * baking a hex value in here.
+ */
 export const SHARD_TYPES = {
   shard: {
     key: 'shard',
-    color: CONFIG.colors.shard,
+    colorKey: 'shard',
     shape: 'circle',
     speedScale: 1,
     score: CONFIG.play.scorePerBlock,
@@ -122,7 +112,7 @@ export const SHARD_TYPES = {
   },
   gold: {
     key: 'gold',
-    color: CONFIG.colors.gold,
+    colorKey: 'gold',
     shape: 'diamond',
     speedScale: 1.35,
     score: CONFIG.play.scorePerGold,
@@ -130,7 +120,7 @@ export const SHARD_TYPES = {
   },
   void: {
     key: 'void',
-    color: CONFIG.colors.void,
+    colorKey: 'void',
     shape: 'spike',
     speedScale: 0.86,
     score: 0,

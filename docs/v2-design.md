@@ -242,7 +242,7 @@ Her faz kendi başına bitirilebilir ve yayınlanabilir:
 
 | Faz | İçerik | Tahmini büyüklük |
 |-----|--------|------------------|
-| **1** | Profil altyapısı + tema sistemi + 3 yeni tema | Orta |
+| **1** ✅ | Profil altyapısı + tema sistemi + 6 tema + açılış kutlaması | Tamamlandı |
 | **2** | Yeni tehdit tipleri + adalet kontrolüne entegrasyon | Orta |
 | **3** | Toplanabilir güçlendirmeler + denge ayarı | Orta |
 | **4** | Menü/ekran mimarisi + nasıl oynanır | Büyük |
@@ -254,6 +254,31 @@ Faz 1-5 tamamen web; her biri bittiğinde itch.io ve GitHub Pages otomatik günc
 Faz 6-7 mağaza tarafı.
 
 ---
+
+## 10b. Faz 1 — tamamlandı
+
+`v2` dalında. Kararlaştırılanlar: yerel skor tablosu, 3 ölüm + 90 saniye reklam
+kuralı, Capacitor ile Google Play.
+
+Yapılanlar:
+- `progress/profile.js` — üç eksenli kalıcı profil, bozuk kayıtta sessiz onarım,
+  v1 yüksek skorunu devralma
+- `progress/unlocks.js` — açılışları bayrakla değil, tur öncesi/sonrası profil
+  farkıyla tespit etme
+- `themes/index.js` — 6 tema; her biri palet **ve** arka plan karakteri
+  (kor, spor, kar, içe çekiliş, dışa patlama)
+- Render katmanı tamamen temaya bağlandı; `SHARD_TYPES` artık sabit renk değil
+  tema anahtarı taşıyor
+- Menüde aktif tema, sonraki hedef ve ilerleme çubuğu; `T` ile tema değiştirme
+- Tur sonu ekranında açılış kutlaması
+
+Testler: 21 yeni test (`tests/progress.test.mjs`), toplam 39.
+
+**Test bir oyun hatası yakaladı:** EMBER ve SOLAR temalarında "bloklanacak"
+mermi ile "dokunulmayacak" diken renk uzayında birbirine çok yakındı (110 ve 116
+birim). Sıcak paletlerde turuncu shard ile kırmızı spike ayırt edilemiyordu — bu
+oyuncunun göremediği bir şeyden ölmesi demek. İki palet düzeltildi ve kural artık
+testle korunuyor.
 
 ## 11. Karar noktaları — senin onayın gerekiyor
 

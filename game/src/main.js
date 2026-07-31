@@ -6,7 +6,8 @@ import { CONFIG } from './config.js';
 import { toggleMute, unlockAudio } from './audio.js';
 import { createInput } from './input.js';
 import { createRenderer, render } from './render/renderer.js';
-import { createGame, handleAction, pauseIfPlaying, togglePause, updateGame } from './state/game.js';
+import { applyTheme, createGame, handleAction, pauseIfPlaying, togglePause, updateGame } from './state/game.js';
+import { THEMES, unlockedThemes } from './themes/index.js';
 import { createViewport, resizeViewport } from './viewport.js';
 
 const canvas = document.getElementById('stage');
@@ -23,10 +24,21 @@ const input = createInput(canvas, viewport, {
   },
   onPause: () => togglePause(game),
   onMute: () => toggleMute(),
+  onCycleTheme: () => cycleTheme(),
 });
 
+/** Steps through the themes the player has actually unlocked. */
+function cycleTheme() {
+  const available = unlockedThemes(game.profile);
+  if (available.length < 2) return;
+
+  const current = available.findIndex((theme) => theme.id === game.theme.id);
+  const next = available[(current + 1) % available.length];
+  applyTheme(game, next.id);
+}
+
 const game = createGame(viewport, input.state);
-const renderer = createRenderer(ctx, viewport);
+const renderer = createRenderer(ctx, viewport, game.theme);
 
 function applyResize() {
   resizeViewport(viewport, canvas, ctx);
@@ -48,9 +60,9 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('blur', () => pauseIfPlaying(game));
 
-// Exposed so automated play-testing can drive a run and read the outcome.
-// Read-mostly game state; nothing here changes how the game plays.
-window.__deflect = { game, viewport };
+// Exposed so automated play-testing can drive a run, switch themes and read the
+// outcome. Read-mostly game state; nothing here changes how the game plays.
+window.__deflect = { game, viewport, applyTheme, themes: THEMES };
 
 let lastFrameTime = performance.now();
 

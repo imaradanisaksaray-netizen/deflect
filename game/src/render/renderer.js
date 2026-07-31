@@ -13,17 +13,26 @@ import { drawCore, drawProjectiles, drawShield } from './entities.js';
 import { drawEffects } from './effects.js';
 import { drawGameOver, drawHud, drawMenu, drawPaused } from './hud.js';
 
-export function createRenderer(ctx, viewport) {
-  return { ctx, viewport, background: createBackground() };
+export function createRenderer(ctx, viewport, theme) {
+  return { ctx, viewport, background: createBackground(theme), themeId: theme.id };
 }
 
 export function render(renderer, game, dt) {
   const { ctx, viewport } = renderer;
+  const { theme } = game;
+
+  // Star density and particle physics are baked in at creation, so a theme
+  // switch needs a fresh backdrop rather than a palette swap.
+  if (renderer.themeId !== theme.id) {
+    renderer.background = createBackground(theme);
+    renderer.themeId = theme.id;
+  }
+
   const energy = computeEnergy(game);
   const danger = computeDanger(game);
 
-  updateBackground(renderer.background, dt, energy);
-  drawBackground(ctx, renderer.background, viewport, { time: game.time, energy, danger });
+  updateBackground(renderer.background, dt, energy, theme);
+  drawBackground(ctx, renderer.background, viewport, { time: game.time, energy, danger, theme });
 
   const shake = game.reducedMotion ? 0 : game.shake * viewport.unit;
   ctx.save();

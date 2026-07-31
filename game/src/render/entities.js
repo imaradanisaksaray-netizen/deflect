@@ -24,17 +24,18 @@ function edgeDistance(angle, viewport) {
 }
 
 export function drawCore(ctx, game) {
+  const { theme } = game;
   const { viewport, time, coreFlash, lives } = game;
   const { centerX, centerY, unit } = viewport;
   const pulse = 1 + Math.sin(time * 2.4) * 0.03;
   const radius = unit * CONFIG.world.coreRadius * pulse;
-  const color = coreFlash > 0.05 ? CONFIG.colors.danger : CONFIG.colors.core;
+  const color = coreFlash > 0.05 ? theme.colors.danger : theme.colors.core;
 
   radialGlow(ctx, centerX, centerY, radius * 3.4, color, 0.6 + coreFlash * 0.6);
 
   const body = ctx.createRadialGradient(centerX, centerY, radius * 0.1, centerX, centerY, radius);
   body.addColorStop(0, withAlpha('#ffffff', 0.62));
-  body.addColorStop(0.4, withAlpha(CONFIG.colors.coreShell, 0.5));
+  body.addColorStop(0.4, withAlpha(theme.colors.coreShell, 0.5));
   body.addColorStop(1, withAlpha(color, 0.12));
 
   ctx.save();
@@ -49,11 +50,11 @@ export function drawCore(ctx, game) {
     context.arc(centerX, centerY, radius, 0, TAU);
   }, { color, width: unit * 0.004, intensity: 0.9, core: false });
 
-  drawIntegrityRing(ctx, viewport, lives, time, coreFlash);
+  drawIntegrityRing(ctx, viewport, lives, time, coreFlash, theme);
 }
 
 /** Three arc segments around the core double as the life counter. */
-function drawIntegrityRing(ctx, viewport, lives, time, coreFlash) {
+function drawIntegrityRing(ctx, viewport, lives, time, coreFlash, theme) {
   const { centerX, centerY, unit } = viewport;
   const radius = unit * CONFIG.world.coreRadius * 1.45;
   const segments = CONFIG.play.startLives;
@@ -63,7 +64,7 @@ function drawIntegrityRing(ctx, viewport, lives, time, coreFlash) {
   for (let i = 0; i < segments; i += 1) {
     const alive = i < lives;
     const start = -Math.PI / 2 + i * (TAU / segments) + gap / 2 + time * 0.25;
-    const color = alive ? CONFIG.colors.coreShell : CONFIG.colors.textDim;
+    const color = alive ? theme.colors.coreShell : theme.colors.textDim;
     const intensity = alive ? 1 - coreFlash * 0.4 : 0.18;
 
     // core: false — a white overlay here would wash the cyan out to grey.
@@ -74,6 +75,7 @@ function drawIntegrityRing(ctx, viewport, lives, time, coreFlash) {
 }
 
 export function drawShield(ctx, game) {
+  const { theme } = game;
   const { viewport, shield, invulnerable, time } = game;
   const { centerX, centerY, unit } = viewport;
   const radius = (CONFIG.world.shieldRadius + shield.recoil) * unit;
@@ -88,7 +90,7 @@ export function drawShield(ctx, game) {
   neonStroke(ctx, (context) => {
     context.arc(centerX, centerY, radius, start, end);
   }, {
-    color: CONFIG.colors.shield,
+    color: theme.colors.shield,
     width: unit * CONFIG.world.shieldThickness,
     intensity: intensity * 0.75,
     core: false,
@@ -97,7 +99,7 @@ export function drawShield(ctx, game) {
   neonStroke(ctx, (context) => {
     context.arc(centerX, centerY, radius, start, end);
   }, {
-    color: CONFIG.colors.shieldEdge,
+    color: theme.colors.shieldEdge,
     width: unit * CONFIG.world.shieldThickness * 0.22,
     intensity: intensity * 0.9,
     core: false,
@@ -107,17 +109,18 @@ export function drawShield(ctx, game) {
   for (const angle of [start, end]) {
     const x = centerX + Math.cos(angle) * radius;
     const y = centerY + Math.sin(angle) * radius;
-    radialGlow(ctx, x, y, unit * 0.035, CONFIG.colors.shield, 0.8 * blink);
+    radialGlow(ctx, x, y, unit * 0.035, theme.colors.shield, 0.8 * blink);
   }
 
   if (shield.flash > 0.02) {
     const x = centerX + Math.cos(shield.angle) * radius;
     const y = centerY + Math.sin(shield.angle) * radius;
-    radialGlow(ctx, x, y, unit * 0.12 * shield.flash, CONFIG.colors.shield, shield.flash);
+    radialGlow(ctx, x, y, unit * 0.12 * shield.flash, theme.colors.shield, shield.flash);
   }
 }
 
 export function drawProjectiles(ctx, game) {
+  const { theme } = game;
   const { viewport, projectiles, time } = game;
 
   for (const projectile of projectiles) {
@@ -125,15 +128,15 @@ export function drawProjectiles(ctx, game) {
 
     const limit = edgeDistance(projectile.angle, viewport);
     if (projectile.distance > limit) {
-      drawEdgeWarning(ctx, viewport, projectile, limit, time);
+      drawEdgeWarning(ctx, viewport, projectile, limit, time, theme);
       continue;
     }
-    drawShard(ctx, viewport, projectile, time);
+    drawShard(ctx, viewport, projectile, time, theme);
   }
 }
 
 /** Marker pinned to the screen edge while a shard is still outside the view. */
-function drawEdgeWarning(ctx, viewport, projectile, limit, time) {
+function drawEdgeWarning(ctx, viewport, projectile, limit, time, theme) {
   const { unit } = viewport;
   const distance = limit - 0.022;
   const x = toScreenX(viewport, projectile.angle, distance);
@@ -151,7 +154,7 @@ function drawEdgeWarning(ctx, viewport, projectile, limit, time) {
     context.lineTo(-size * 0.3, size * 0.75);
     context.closePath();
   }, {
-    color: projectile.archetype.color,
+    color: theme.colors[projectile.archetype.colorKey],
     width: unit * 0.005,
     intensity: (0.35 + proximity * 0.65) * pulse,
     core: false,
@@ -159,7 +162,7 @@ function drawEdgeWarning(ctx, viewport, projectile, limit, time) {
   ctx.restore();
 }
 
-function drawShard(ctx, viewport, projectile, time) {
+function drawShard(ctx, viewport, projectile, time, theme) {
   const { unit } = viewport;
   const { angle, distance, archetype } = projectile;
   const x = toScreenX(viewport, angle, distance);
@@ -167,8 +170,8 @@ function drawShard(ctx, viewport, projectile, time) {
   const radius = unit * CONFIG.world.projectileRadius;
   const fadeIn = clamp(projectile.age * 4, 0, 1);
 
-  drawTrail(ctx, viewport, projectile, fadeIn);
-  radialGlow(ctx, x, y, radius * 2.6, archetype.color, 0.55 * fadeIn);
+  drawTrail(ctx, viewport, projectile, fadeIn, theme);
+  radialGlow(ctx, x, y, radius * 2.6, theme.colors[archetype.colorKey], 0.55 * fadeIn);
 
   ctx.save();
   ctx.translate(x, y);
@@ -177,7 +180,7 @@ function drawShard(ctx, viewport, projectile, time) {
     ctx.rotate(projectile.spin * 0.4);
     neonStroke(ctx, (context) => {
       context.arc(0, 0, radius * 0.62, 0, TAU);
-    }, { color: archetype.color, width: unit * 0.008, intensity: fadeIn });
+    }, { color: theme.colors[archetype.colorKey], width: unit * 0.008, intensity: fadeIn });
   } else if (archetype.shape === 'diamond') {
     ctx.rotate(projectile.spin);
     neonStroke(ctx, (context) => {
@@ -186,7 +189,7 @@ function drawShard(ctx, viewport, projectile, time) {
       context.lineTo(0, radius * 0.8);
       context.lineTo(-radius * 0.62, 0);
       context.closePath();
-    }, { color: archetype.color, width: unit * 0.008, intensity: fadeIn });
+    }, { color: theme.colors[archetype.colorKey], width: unit * 0.008, intensity: fadeIn });
   } else {
     ctx.rotate(-projectile.spin * 1.3);
     const spikes = 3;
@@ -201,13 +204,13 @@ function drawShard(ctx, viewport, projectile, time) {
         else context.lineTo(px, py);
       }
       context.closePath();
-    }, { color: archetype.color, width: unit * 0.009, intensity: fadeIn });
+    }, { color: theme.colors[archetype.colorKey], width: unit * 0.009, intensity: fadeIn });
   }
 
   ctx.restore();
 }
 
-function drawTrail(ctx, viewport, projectile, fadeIn) {
+function drawTrail(ctx, viewport, projectile, fadeIn, theme) {
   const { unit } = viewport;
   const length = Math.min(0.16, projectile.speed * 0.22);
   const tail = Math.min(projectile.spawnDistance, projectile.distance + length);
@@ -218,8 +221,8 @@ function drawTrail(ctx, viewport, projectile, fadeIn) {
   const toY = toScreenY(viewport, projectile.angle, projectile.distance);
 
   const gradient = ctx.createLinearGradient(fromX, fromY, toX, toY);
-  gradient.addColorStop(0, withAlpha(projectile.archetype.color, 0));
-  gradient.addColorStop(1, withAlpha(projectile.archetype.color, 0.5 * fadeIn));
+  gradient.addColorStop(0, withAlpha(theme.colors[projectile.archetype.colorKey], 0));
+  gradient.addColorStop(1, withAlpha(theme.colors[projectile.archetype.colorKey], 0.5 * fadeIn));
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -234,9 +237,9 @@ function drawTrail(ctx, viewport, projectile, fadeIn) {
 }
 
 /** Small preview shard used by the menu's how-to-play row. */
-export function drawShardIcon(ctx, x, y, size, typeKey, spin = 0) {
+export function drawShardIcon(ctx, x, y, size, typeKey, spin, theme) {
   const archetype = SHARD_TYPES[typeKey];
-  radialGlow(ctx, x, y, size * 2, archetype.color, 0.5);
+  radialGlow(ctx, x, y, size * 2, theme.colors[archetype.colorKey], 0.5);
 
   ctx.save();
   ctx.translate(x, y);
@@ -244,7 +247,7 @@ export function drawShardIcon(ctx, x, y, size, typeKey, spin = 0) {
 
   if (archetype.shape === 'circle') {
     neonStroke(ctx, (context) => context.arc(0, 0, size * 0.62, 0, TAU), {
-      color: archetype.color, width: size * 0.2, intensity: 1,
+      color: theme.colors[archetype.colorKey], width: size * 0.2, intensity: 1,
     });
   } else if (archetype.shape === 'diamond') {
     neonStroke(ctx, (context) => {
@@ -253,7 +256,7 @@ export function drawShardIcon(ctx, x, y, size, typeKey, spin = 0) {
       context.lineTo(0, size * 0.8);
       context.lineTo(-size * 0.62, 0);
       context.closePath();
-    }, { color: archetype.color, width: size * 0.2, intensity: 1 });
+    }, { color: theme.colors[archetype.colorKey], width: size * 0.2, intensity: 1 });
   } else {
     neonStroke(ctx, (context) => {
       for (let i = 0; i < 6; i += 1) {
@@ -265,7 +268,7 @@ export function drawShardIcon(ctx, x, y, size, typeKey, spin = 0) {
         else context.lineTo(px, py);
       }
       context.closePath();
-    }, { color: archetype.color, width: size * 0.22, intensity: 1 });
+    }, { color: theme.colors[archetype.colorKey], width: size * 0.22, intensity: 1 });
   }
 
   ctx.restore();

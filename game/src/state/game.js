@@ -24,7 +24,9 @@ import { clearEffects, createEffects, emitBurst, emitWave, updateEffects } from 
 import { resolveCollisions } from '../systems/collision.js';
 import { createSpawner, updateSpawner } from '../systems/spawner.js';
 import { difficultyAt } from '../systems/difficulty.js';
-import { readHighScore, writeHighScore } from '../storage.js';
+import { loadProfile, markUnlocksSeen, recordRun, saveProfile } from '../progress/profile.js';
+import { collectUnlocks } from '../progress/unlocks.js';
+import { getTheme } from '../themes/index.js';
 import { toScreenX, toScreenY } from '../viewport.js';
 
 export const SCREEN = {
@@ -36,11 +38,19 @@ export const SCREEN = {
 
 export function createGame(viewport, input) {
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const profile = loadProfile();
 
   return {
     viewport,
     input,
     reducedMotion,
+    /** Persistent progress across runs. Replaced (not mutated) on every save. */
+    profile,
+    theme: getTheme(profile.themeId),
+    /** Unlocks earned by the run that just ended, shown once on the score screen. */
+    pendingUnlocks: [],
+    /** Shards blocked in the current run — folded into the profile at run end. */
+    blocks: 0,
     screen: SCREEN.menu,
     shield: createShield(),
     projectiles: [],
@@ -51,7 +61,7 @@ export function createGame(viewport, input) {
     time: 0,
     elapsed: 0,
     score: 0,
-    highScore: readHighScore(),
+    highScore: profile.bestScore,
     newRecord: false,
     lives: CONFIG.play.startLives,
     combo: 0,
@@ -83,6 +93,8 @@ export function startRun(game) {
   game.invulnerable = 0;
   game.newRecord = false;
   game.introFade = 0;
+  game.blocks = 0;
+  game.pendingUnlocks = [];
   clearEffects(game.effects);
   playStart();
 }
@@ -91,14 +103,37 @@ function endRun(game) {
   game.screen = SCREEN.gameover;
   game.shake = Math.min(CONFIG.feel.maxShake, game.shake + 0.03);
 
-  if (Math.floor(game.score) > game.highScore) {
-    game.highScore = Math.floor(game.score);
+  const score = Math.floor(game.score);
+  const before = game.profile;
+  const after = recordRun(before, {
+    blocks: game.blocks,
+    streak: game.bestCombo,
+    seconds: game.elapsed,
+    score,
+  });
+
+  // Unlocks are derived by comparing the profile before and after the run, so
+  // the run that crosses a threshold is the one that celebrates it.
+  game.pendingUnlocks = collectUnlocks(before, after);
+  game.profile = game.pendingUnlocks.length
+    ? markUnlocksSeen(after, game.pendingUnlocks.map((u) => u.id))
+    : after;
+  saveProfile(game.profile);
+
+  if (score > game.highScore) {
+    game.highScore = score;
     game.newRecord = true;
-    writeHighScore(game.highScore);
     playNewRecord();
   } else {
     playGameOver();
   }
+}
+
+/** Switches the active theme and remembers the choice. */
+export function applyTheme(game, themeId) {
+  game.theme = getTheme(themeId);
+  game.profile = { ...game.profile, themeId: game.theme.id };
+  saveProfile(game.profile);
 }
 
 /** Primary action: click / tap / Space. Meaning depends on the current screen. */
@@ -180,9 +215,11 @@ function applyEvents(game, events) {
 }
 
 function onBlock(game, event) {
+  const { theme } = game;
   const { projectile } = event;
   const isGold = projectile.type === 'gold';
 
+  game.blocks += 1;
   game.combo += 1;
   game.bestCombo = Math.max(game.bestCombo, game.combo);
   game.multiplier = clamp(
@@ -197,7 +234,7 @@ function onBlock(game, event) {
 
   const x = toScreenX(game.viewport, projectile.angle, event.distance);
   const y = toScreenY(game.viewport, projectile.angle, event.distance);
-  const color = projectile.archetype.color;
+  const color = theme.colors[projectile.archetype.colorKey];
 
   emitBurst(game.effects, {
     x,
@@ -223,6 +260,7 @@ function onBlock(game, event) {
 }
 
 function onDamage(game, event) {
+  const { theme } = game;
   const { projectile } = event;
   const x = toScreenX(game.viewport, projectile.angle, event.distance);
   const y = toScreenY(game.viewport, projectile.angle, event.distance);
@@ -230,7 +268,7 @@ function onDamage(game, event) {
   emitBurst(game.effects, {
     x,
     y,
-    color: projectile.archetype.color,
+    color: theme.colors[projectile.archetype.colorKey],
     count: 30,
     speed: 420,
   });
@@ -248,7 +286,7 @@ function onDamage(game, event) {
   emitWave(game.effects, {
     x: game.viewport.centerX,
     y: game.viewport.centerY,
-    color: CONFIG.colors.danger,
+    color: theme.colors.danger,
     radius: game.viewport.unit * CONFIG.world.coreRadius,
     life: 0.5,
     thickness: 6,
@@ -260,10 +298,11 @@ function onDamage(game, event) {
 }
 
 function onVoidPass(game) {
+  const { theme } = game;
   emitBurst(game.effects, {
     x: game.viewport.centerX + rand(-6, 6),
     y: game.viewport.centerY + rand(-6, 6),
-    color: CONFIG.colors.void,
+    color: theme.colors.void,
     count: 8,
     speed: 120,
     size: 2,

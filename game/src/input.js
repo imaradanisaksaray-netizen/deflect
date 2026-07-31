@@ -82,6 +82,11 @@ export function createInput(canvas, viewport, handlers = {}) {
     if (event.code === 'KeyM') {
       handlers.onMute?.();
       event.preventDefault();
+      return;
+    }
+    if (event.code === 'KeyT') {
+      handlers.onCycleTheme?.();
+      event.preventDefault();
     }
   };
 
