@@ -43,7 +43,17 @@ responsive, 26 KB). Yani:
 
 ### Playables başvurusu
 
-İlgi formunu doldur. Formda işine yarayacak somut veriler:
+**Durum: gönderildi (31 Temmuz 2026).** Başvuru `imaradanis.aksaray@gmail.com`
+hesabıyla yapıldı; yanıtın bir kopyası o adrese gitti. Google'ın dönüşü:
+*"ekibimiz sürekli yeni oyunları inceliyor, uygun bulursak size ulaşırız."*
+Yanıt süresi ve garantisi yok. Formu düzenlemek gerekirse aynı Google hesabıyla
+form bağlantısı üzerinden yanıt güncellenebilir.
+
+Gönderilen bilgiler: birey başvurusu (şirket yok), Rıza Yılmaz / Independent
+developer, tek oyun, itch.io + GitHub Pages + kaynak kod bağlantıları, aylık
+aktif kullanıcı 1-100 aralığı, yayın platformu Web.
+
+Formda işine yarayan somut veriler:
 
 | Alan | Değer |
 |------|-------|
