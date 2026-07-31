@@ -5,6 +5,30 @@ Kanal: [@acubearcade](https://www.youtube.com/@acubearcade) · Oyun: [acubegame.
 Kayıtlar dikey (1080×1920) alındı, kırpma gerekmiyor. Oyun her ekran oranında aynı
 çalıştığı için kadrajda kayıp yok.
 
+## Hazır klipler
+
+Masaüstünde `SHORTS-klipler` klasöründe, hepsi 1080×1920, sessiz (üzerine müzik ekle):
+
+| Dosya | Süre | İçerik | Plandaki fikir |
+|-------|------|--------|----------------|
+| `1-OVERDRIVE.mp4` | 26 sn | Sakin oynanış → OVERDRIVE yazısı → hız patlaması | #1 |
+| `2-REKOR-FINAL.mp4` | 21 sn | 23.201 puan, x7 çarpan, son can, ölüm | #2 + #6 |
+| `3-ILK-10-SANIYE.mp4` | 14 sn | Turun açılışı, ekranda "BLOCK THE LIGHT" ipucu | #7 |
+| `4-OLUM-DERLEMESI.mp4` | 17,5 sn | Beş farklı turun son saniyeleri, hızlı kesme | #8 |
+
+Ham kayıtlar (5 × 4 dakika, 20,4 dakika toplam) oturum klasöründe `footage/segment-*.mp4`
+olarak duruyor — başka klip gerekirse oradan kesilir.
+
+### Klipler nasıl bulundu
+
+Videolarda ilginç anları elle aramak yerine parlaklık zaman serisi çıkardım
+(`fps=2,signalstats`). Desen net: her turda parlaklık 130-160. saniyede zirve yapıyor
+(ekranda en çok mermi ve parçacık olduğu an), hemen ardından çöküyor (game over
+karartması). Yani parlaklık tepesi = ölüm öncesi en yoğun saniyeler, tam da klip
+istediğimiz yer.
+
+Tespit edilen ölüm anları: segment 1 → 138s, 2 → 135s, 3 → 162s, 4 → 152s, 5 → 197s.
+
 ## Format kuralları
 
 Bunlar genel tavsiye değil, bu oyunun yapısından çıkan kurallar:
