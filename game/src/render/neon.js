@@ -114,7 +114,7 @@ export function spacedText(ctx, text, x, y, spacing, align = 'center') {
 }
 
 /** Glowing text: a few offset passes under a bright core pass. */
-export function neonText(ctx, text, x, y, { size, color, spacing = 0, weight = 700, font = 'sans', align = 'center', intensity = 1 }) {
+export function neonText(ctx, text, x, y, { size, color, spacing = 0, weight = 700, font = 'sans', align = 'center', intensity = 1, alpha = 1 }) {
   const family = font === 'mono'
     ? "ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace"
     : "system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -127,7 +127,7 @@ export function neonText(ctx, text, x, y, { size, color, spacing = 0, weight = 7
   // Offset passes build the halo.
   ctx.fillStyle = withAlpha(color, 0.14 * intensity);
   for (const offset of [3, 2, 1]) {
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.5 * alpha;
     spacedText(ctx, text, x + offset * 0.5, y, spacing, align);
     spacedText(ctx, text, x - offset * 0.5, y, spacing, align);
   }
@@ -135,7 +135,7 @@ export function neonText(ctx, text, x, y, { size, color, spacing = 0, weight = 7
   // The body is drawn with normal blending. Additive here would push a
   // saturated red past 255 on one channel only and turn it pink.
   ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   spacedText(ctx, text, x, y, spacing, align);
 

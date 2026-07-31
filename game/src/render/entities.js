@@ -80,7 +80,9 @@ export function drawShield(ctx, game) {
   const { viewport, shield, invulnerable, time } = game;
   const { centerX, centerY, unit } = viewport;
   const radius = (CONFIG.world.shieldRadius + shield.recoil) * unit;
-  const half = CONFIG.shield.arcSpan / 2;
+  // Read from the shield, not the config: WIDE GUARD widens it at runtime and
+  // what is drawn must match what actually blocks.
+  const half = (shield.arcSpan ?? CONFIG.shield.arcSpan) / 2;
   const start = shield.angle - half;
   const end = shield.angle + half;
 
@@ -134,6 +136,99 @@ export function drawProjectiles(ctx, game) {
     }
     drawShard(ctx, viewport, projectile, time, theme);
   }
+}
+
+/**
+ * Rewards drifting in.
+ *
+ * Drawn after the shards so a pickup is never hidden behind one, and given a
+ * slow halo pulse no shard has — in a crowded frame the motion reads before the
+ * shape does.
+ */
+export function drawPickups(ctx, game) {
+  const { theme, viewport, pickups, time } = game;
+  const { unit } = viewport;
+  const color = theme.colors.pickup;
+
+  for (const pickup of pickups) {
+    if (!pickup.alive) continue;
+
+    const limit = edgeDistance(pickup.angle, viewport);
+    const distance = Math.min(pickup.distance, limit - 0.022);
+    const x = toScreenX(viewport, pickup.angle, distance);
+    const y = toScreenY(viewport, pickup.angle, distance);
+    const radius = unit * CONFIG.pickups.radius;
+    const fadeIn = clamp(pickup.age * 3, 0, 1);
+    const pulse = 0.7 + 0.3 * Math.sin(time * 4 + pickup.spin);
+
+    radialGlow(ctx, x, y, radius * 3.4 * pulse, color, 0.6 * fadeIn);
+
+    ctx.save();
+    ctx.translate(x, y);
+    // A slowly counter-rotating ring frames every reward identically, so the
+    // symbol inside is the only thing the player has to read.
+    ctx.save();
+    ctx.rotate(-pickup.spin * 0.5);
+    neonStroke(ctx, (context) => {
+      for (let i = 0; i < 3; i += 1) {
+        const start = (i / 3) * TAU;
+        context.moveTo(Math.cos(start) * radius * 1.25, Math.sin(start) * radius * 1.25);
+        context.arc(0, 0, radius * 1.25, start, start + 0.72);
+      }
+    }, { color, width: unit * 0.005, intensity: fadeIn * 0.85, core: false });
+    ctx.restore();
+
+    drawPickupSymbol(ctx, pickup.archetype.symbol, radius, unit, color, fadeIn);
+    ctx.restore();
+  }
+}
+
+function drawPickupSymbol(ctx, symbol, radius, unit, color, intensity) {
+  const stroke = unit * 0.008;
+
+  if (symbol === 'cross') {
+    neonStroke(ctx, (context) => {
+      context.moveTo(-radius * 0.55, 0);
+      context.lineTo(radius * 0.55, 0);
+      context.moveTo(0, -radius * 0.55);
+      context.lineTo(0, radius * 0.55);
+    }, { color, width: stroke, intensity });
+    return;
+  }
+
+  // WIDE GUARD: two chevrons pushing apart. An arc would have been the literal
+  // shield silhouette, but it reads as part of the ring framing every pickup.
+  if (symbol === 'arc') {
+    neonStroke(ctx, (context) => {
+      context.moveTo(-radius * 0.15, -radius * 0.42);
+      context.lineTo(-radius * 0.6, 0);
+      context.lineTo(-radius * 0.15, radius * 0.42);
+      context.moveTo(radius * 0.15, -radius * 0.42);
+      context.lineTo(radius * 0.6, 0);
+      context.lineTo(radius * 0.15, radius * 0.42);
+    }, { color, width: stroke, intensity });
+    return;
+  }
+
+  if (symbol === 'hourglass') {
+    neonStroke(ctx, (context) => {
+      context.moveTo(-radius * 0.45, -radius * 0.5);
+      context.lineTo(radius * 0.45, -radius * 0.5);
+      context.lineTo(-radius * 0.45, radius * 0.5);
+      context.lineTo(radius * 0.45, radius * 0.5);
+      context.closePath();
+    }, { color, width: stroke, intensity });
+    return;
+  }
+
+  // NOVA: rays firing outward, matching what it does to the screen.
+  neonStroke(ctx, (context) => {
+    for (let i = 0; i < 6; i += 1) {
+      const a = (i / 6) * TAU;
+      context.moveTo(Math.cos(a) * radius * 0.2, Math.sin(a) * radius * 0.2);
+      context.lineTo(Math.cos(a) * radius * 0.66, Math.sin(a) * radius * 0.66);
+    }
+  }, { color, width: stroke, intensity });
 }
 
 /** Marker pinned to the screen edge while a shard is still outside the view. */

@@ -5,6 +5,7 @@
 import { CONFIG } from './config.js';
 import { toggleMute, unlockAudio } from './audio.js';
 import { createProjectile } from './entities/projectiles.js';
+import { createPickup } from './systems/pickups.js';
 import { createInput } from './input.js';
 import { createRenderer, render } from './render/renderer.js';
 import { applyTheme, createGame, handleAction, pauseIfPlaying, togglePause, updateGame } from './state/game.js';
@@ -63,7 +64,7 @@ window.addEventListener('blur', () => pauseIfPlaying(game));
 
 // Exposed so automated play-testing can drive a run, switch themes and read the
 // outcome. Read-mostly game state; nothing here changes how the game plays.
-window.__deflect = { game, viewport, applyTheme, themes: THEMES, createProjectile };
+window.__deflect = { game, viewport, applyTheme, themes: THEMES, createProjectile, createPickup };
 
 let lastFrameTime = performance.now();
 

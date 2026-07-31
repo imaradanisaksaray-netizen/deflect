@@ -82,6 +82,30 @@ export const CONFIG = {
     burstChanceCap: 0.6,
   },
 
+  /**
+   * Pickups: the only thing in the game that rewards catching something other
+   * than a shard. They are deliberately rare — frequent relief would flatten the
+   * difficulty curve the endless ramp exists to create.
+   */
+  pickups: {
+    /** No pickup can appear before this many seconds into a run. */
+    graceTime: 26,
+    /** Average seconds between pickups, and the jitter around that. */
+    interval: 24,
+    intervalJitter: 9,
+    /** Travel speed, in units/second. Slower than any shard so it is catchable. */
+    speed: 0.26,
+    radius: 0.03,
+    /** Only one can be in flight at a time. */
+    maxActive: 1,
+    /** Core repairs stop mattering past this many lives. */
+    maxLives: 5,
+    /** Arc multiplier while WIDE GUARD is active. */
+    extendScale: 1.7,
+    /** Time multiplier while SLIPSTREAM is active. */
+    slowFactor: 0.45,
+  },
+
   feel: {
     telegraphTime: 0.45,
     hitStopDuration: 0.09,
@@ -207,6 +231,48 @@ export const SHARD_TYPES = {
     burstGap: 0.07,
   },
 };
+
+/**
+ * Pickup archetypes.
+ *
+ * All of them share one colour — the theme's `pickup` — because colour answers
+ * the only question that matters mid-run: catch it, or stay away? The symbol
+ * says *which* reward it is, and that can be read at leisure.
+ */
+export const PICKUP_TYPES = {
+  /** Restores one core segment. Never spawns at full health. */
+  life: {
+    key: 'life',
+    symbol: 'cross',
+    weight: 1,
+    label: 'CORE REPAIR',
+  },
+  /** Widens the shield arc for a while. */
+  extend: {
+    key: 'extend',
+    symbol: 'arc',
+    weight: 1.2,
+    duration: 9,
+    label: 'WIDE GUARD',
+  },
+  /** Slows the whole run down — including the clock, so safety costs score. */
+  slow: {
+    key: 'slow',
+    symbol: 'hourglass',
+    weight: 1.2,
+    duration: 6,
+    label: 'SLIPSTREAM',
+  },
+  /** Clears every blockable shard on screen and pays for each one. */
+  nova: {
+    key: 'nova',
+    symbol: 'burst',
+    weight: 0.9,
+    label: 'NOVA',
+  },
+};
+
+export const PICKUP_KEYS = Object.keys(PICKUP_TYPES);
 
 /** Types that exist from the very first run. */
 export const BASE_TYPES = ['shard', 'gold', 'void'];

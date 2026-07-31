@@ -6,7 +6,7 @@
  * extreme aspect ratios.
  */
 
-import { CONFIG } from '../config.js';
+import { CONFIG, PICKUP_TYPES } from '../config.js';
 import { isMuted } from '../audio.js';
 import { clamp, easeOutCubic } from '../math.js';
 import { SCREEN } from '../state/game.js';
@@ -34,6 +34,8 @@ export function drawHud(ctx, game) {
   if (screen === SCREEN.playing || screen === SCREEN.paused) {
     drawScore(ctx, game);
     drawRunHints(ctx, game);
+    drawActiveBuffs(ctx, game);
+    drawPickupBanner(ctx, game);
   }
 
   // The menu prints its own, larger BEST line — no need to show it twice.
@@ -80,6 +82,64 @@ function drawScore(ctx, game) {
     spacing: unit * 0.004,
     font: 'mono',
     weight: 700,
+  });
+}
+
+/**
+ * Timed rewards, as draining bars in the bottom-left.
+ *
+ * A bar rather than a number: the player is watching the centre of the screen
+ * and only needs to know "still on / running out", which peripheral vision can
+ * read from a shrinking line but not from digits.
+ */
+function drawActiveBuffs(ctx, game) {
+  const { theme, viewport, buffs } = game;
+  const { height, unit } = viewport;
+
+  const active = [
+    { key: 'extend', label: 'WIDE GUARD', duration: PICKUP_TYPES.extend.duration },
+    { key: 'slow', label: 'SLIPSTREAM', duration: PICKUP_TYPES.slow.duration },
+  ].filter((entry) => buffs[entry.key] > 0);
+
+  active.forEach((entry, index) => {
+    const y = height - unit * 0.07 - index * unit * 0.055;
+    const remaining = clamp(buffs[entry.key] / entry.duration, 0, 1);
+    const barWidth = unit * 0.14;
+
+    plainText(ctx, entry.label, unit * 0.045, y, {
+      size: unit * 0.02,
+      color: theme.colors.pickup,
+      spacing: unit * 0.003,
+      align: 'left',
+      font: 'mono',
+      alpha: 0.9,
+    });
+
+    ctx.save();
+    ctx.fillStyle = withAlpha(theme.colors.pickup, 0.18);
+    ctx.fillRect(unit * 0.045, y + unit * 0.012, barWidth, unit * 0.006);
+    ctx.fillStyle = withAlpha(theme.colors.pickup, 0.9);
+    ctx.fillRect(unit * 0.045, y + unit * 0.012, barWidth * remaining, unit * 0.006);
+    ctx.restore();
+  });
+}
+
+/** Names the reward that was just caught, then fades out. */
+function drawPickupBanner(ctx, game) {
+  const { theme, viewport, pickupBanner } = game;
+  if (!pickupBanner) return;
+
+  const { width, height, unit } = viewport;
+  // Fades over the last third of its life so it never lingers as clutter.
+  const alpha = clamp(pickupBanner.life / 0.55, 0, 1);
+
+  neonText(ctx, pickupBanner.label, width / 2, height * 0.185, {
+    size: unit * 0.032,
+    color: theme.colors.pickup,
+    spacing: unit * 0.008,
+    font: 'mono',
+    weight: 700,
+    alpha,
   });
 }
 

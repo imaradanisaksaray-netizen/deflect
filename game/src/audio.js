@@ -132,6 +132,20 @@ export function playReveal() {
   tone({ freq: 900, glideTo: 220, type: 'sawtooth', duration: 0.18, gain: 0.16 });
 }
 
+/**
+ * Catching a reward — a rising four-note figure.
+ *
+ * Everything else in the game falls in pitch or stays flat, so an unmistakable
+ * climb tells the player something good happened without them looking away from
+ * the shards still on screen.
+ */
+export function playPickup() {
+  const steps = [523, 659, 784, 1047];
+  steps.forEach((freq, i) => {
+    tone({ freq, type: 'triangle', duration: 0.14, gain: 0.17, delay: i * 0.055 });
+  });
+}
+
 export function playGold() {
   tone({ freq: 660, type: 'triangle', duration: 0.09, gain: 0.2 });
   tone({ freq: 880, type: 'triangle', duration: 0.12, gain: 0.18, delay: 0.06 });

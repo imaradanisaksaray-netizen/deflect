@@ -9,7 +9,7 @@ import { CONFIG } from '../config.js';
 import { clamp, rand } from '../math.js';
 import { SCREEN } from '../state/game.js';
 import { createBackground, drawBackground, updateBackground } from './background.js';
-import { drawCore, drawProjectiles, drawShield } from './entities.js';
+import { drawCore, drawPickups, drawProjectiles, drawShield } from './entities.js';
 import { drawEffects } from './effects.js';
 import { drawGameOver, drawHud, drawMenu, drawPaused } from './hud.js';
 
@@ -46,6 +46,7 @@ export function render(renderer, game, dt) {
   }
 
   drawProjectiles(ctx, game);
+  drawPickups(ctx, game);
   drawShield(ctx, game);
   drawCore(ctx, game);
   drawEffects(ctx, game.effects);

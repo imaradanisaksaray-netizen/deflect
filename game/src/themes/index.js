@@ -44,6 +44,7 @@ export const THEMES = [
       void: '#ff1f4b',
       text: '#eae4ff',
       textDim: '#8f81c6',
+      pickup: '#4dff88',
       danger: '#ff1f4b',
     },
     backdrop: {
@@ -78,6 +79,7 @@ export const THEMES = [
       void: '#ff1744',
       text: '#ffeede',
       textDim: '#c69377',
+      pickup: '#3dffa0',
       danger: '#ff1744',
     },
     backdrop: {
@@ -111,6 +113,7 @@ export const THEMES = [
       void: '#ff1f6b',
       text: '#eaffde',
       textDim: '#84b877',
+      pickup: '#3ce8ff',
       danger: '#ff1f6b',
     },
     backdrop: {
@@ -143,6 +146,7 @@ export const THEMES = [
       void: '#ff4d6d',
       text: '#e8f6ff',
       textDim: '#7c9fbd',
+      pickup: '#3dff7a',
       danger: '#ff4d6d',
     },
     backdrop: {
@@ -175,6 +179,7 @@ export const THEMES = [
       void: '#ff3355',
       text: '#f4e9ff',
       textDim: '#9a80b8',
+      pickup: '#55ff88',
       danger: '#ff3355',
     },
     backdrop: {
@@ -210,6 +215,7 @@ export const THEMES = [
       void: '#ff1030',
       text: '#fff8e4',
       textDim: '#c4a866',
+      pickup: '#2dffb0',
       danger: '#ff1030',
     },
     backdrop: {

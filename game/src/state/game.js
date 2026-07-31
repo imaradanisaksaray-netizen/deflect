@@ -14,16 +14,18 @@ import {
   playGameOver,
   playGold,
   playNewRecord,
+  playPickup,
   playReveal,
   playShellCrack,
   playStart,
   playVoidPass,
 } from '../audio.js';
 import { clamp, damp, rand } from '../math.js';
-import { createShield, registerImpact, updateShield } from '../entities/shield.js';
-import { colorKeyOf, createFragments, updateProjectiles } from '../entities/projectiles.js';
+import { createShield, registerImpact, setShieldSpan, updateShield } from '../entities/shield.js';
+import { colorKeyOf, createFragments, isBlockable, updateProjectiles } from '../entities/projectiles.js';
 import { clearEffects, createEffects, emitBurst, emitWave, updateEffects } from '../entities/particles.js';
 import { resolveCollisions } from '../systems/collision.js';
+import { createPickupSpawner, updatePickupSpawner, updatePickups } from '../systems/pickups.js';
 import { createSpawner, updateSpawner } from '../systems/spawner.js';
 import { difficultyAt } from '../systems/difficulty.js';
 import { loadProfile, markUnlocksSeen, recordRun, saveProfile } from '../progress/profile.js';
@@ -58,8 +60,15 @@ export function createGame(viewport, input) {
     screen: SCREEN.menu,
     shield: createShield(),
     projectiles: [],
+    /** Rewards currently drifting in. At most one at a time. */
+    pickups: [],
+    /** Seconds remaining on each timed reward; 0 means inactive. */
+    buffs: { extend: 0, slow: 0 },
+    /** The reward just collected, shown briefly in the HUD. */
+    pickupBanner: null,
     effects: createEffects(reducedMotion ? 0.3 : 1),
     spawner: createSpawner(),
+    pickupSpawner: createPickupSpawner(),
     difficulty: difficultyAt(0),
     /** Wall-clock time, always advancing — drives background animation. */
     time: 0,
@@ -85,7 +94,11 @@ export function createGame(viewport, input) {
 export function startRun(game) {
   game.screen = SCREEN.playing;
   game.projectiles.length = 0;
+  game.pickups.length = 0;
+  game.buffs = { extend: 0, slow: 0 };
+  game.pickupBanner = null;
   game.spawner = createSpawner();
+  game.pickupSpawner = createPickupSpawner();
   game.shield = createShield();
   game.difficulty = difficultyAt(0);
   game.elapsed = 0;
@@ -107,6 +120,9 @@ export function startRun(game) {
 
 function endRun(game) {
   game.screen = SCREEN.gameover;
+  // Rewards do not outlive the run that earned them.
+  game.buffs = { extend: 0, slow: 0 };
+  game.pickups.length = 0;
   game.shake = Math.min(CONFIG.feel.maxShake, game.shake + 0.03);
 
   const score = Math.floor(game.score);
@@ -173,6 +189,16 @@ export function updateGame(game, dt) {
 
   // The shield keeps tracking on every screen so the game always feels alive.
   updateShield(game.shield, game.input, dt, game.screen === SCREEN.menu ? 0.5 : 0);
+  setShieldSpan(
+    game.shield,
+    CONFIG.shield.arcSpan * (game.buffs.extend > 0 ? CONFIG.pickups.extendScale : 1),
+    dt,
+  );
+
+  if (game.pickupBanner) {
+    game.pickupBanner.life -= dt;
+    if (game.pickupBanner.life <= 0) game.pickupBanner = null;
+  }
 
   if (game.screen !== SCREEN.playing) {
     if (game.screen === SCREEN.gameover) game.elapsed += dt;
@@ -186,6 +212,15 @@ export function updateGame(game, dt) {
     scaledDt = dt * 0.15;
   }
 
+  // Buffs burn real seconds, never slowed ones — otherwise SLIPSTREAM would
+  // stretch its own duration and a six-second reward would last thirteen.
+  game.buffs.extend = Math.max(0, game.buffs.extend - dt);
+  game.buffs.slow = Math.max(0, game.buffs.slow - dt);
+
+  // SLIPSTREAM slows the entire run, the clock included. Safety costs score,
+  // which is what stops it from being a strictly free reward.
+  if (game.buffs.slow > 0) scaledDt *= CONFIG.pickups.slowFactor;
+
   game.introFade = Math.min(1, game.introFade + dt * 1.4);
   game.elapsed += scaledDt;
   game.difficulty = difficultyAt(game.elapsed);
@@ -196,6 +231,8 @@ export function updateGame(game, dt) {
   announceReveals(game);
 
   const events = [];
+  updatePickupSpawner(game.pickupSpawner, game, scaledDt);
+  updatePickups(game, scaledDt, events);
   resolveCollisions(game, events);
   applyEvents(game, events);
 
@@ -232,6 +269,9 @@ function applyEvents(game, events) {
         break;
       case 'voidPass':
         onVoidPass(game);
+        break;
+      case 'pickup':
+        onPickup(game, event);
         break;
       default:
         break;
@@ -351,6 +391,101 @@ function onDamage(game, event) {
   playDamage();
 
   if (game.lives <= 0) endRun(game);
+}
+
+/**
+ * A reward was caught.
+ *
+ * The effect is applied here rather than in pickups.js because every one of them
+ * reaches into a different part of the run — lives, the shield, the clock, the
+ * whole projectile list — and that is exactly the state this module owns.
+ */
+function onPickup(game, event) {
+  const { theme } = game;
+  const { pickup } = event;
+  const x = toScreenX(game.viewport, pickup.angle, event.distance);
+  const y = toScreenY(game.viewport, pickup.angle, event.distance);
+
+  switch (pickup.type) {
+    case 'life':
+      game.lives = Math.min(CONFIG.pickups.maxLives, game.lives + 1);
+      game.coreFlash = 1;
+      break;
+    case 'extend':
+    case 'slow':
+      // Re-catching a reward refreshes it rather than stacking, so the ceiling
+      // on how safe a run can get stays fixed.
+      game.buffs[pickup.type] = pickup.archetype.duration;
+      break;
+    case 'nova':
+      detonateNova(game);
+      break;
+    default:
+      break;
+  }
+
+  game.pickupBanner = { label: pickup.archetype.label, life: 1.6 };
+  registerImpact(game.shield, 1.2);
+
+  emitBurst(game.effects, {
+    x,
+    y,
+    color: theme.colors.pickup,
+    count: 30,
+    direction: pickup.angle + Math.PI,
+    spread: Math.PI,
+    speed: 340,
+  });
+  emitWave(game.effects, {
+    x,
+    y,
+    color: theme.colors.pickup,
+    radius: game.viewport.unit * 0.02,
+    life: 0.5,
+    thickness: 4,
+    growth: 420,
+  });
+  playPickup();
+}
+
+/**
+ * Clears the screen of everything that could have been blocked, paying for each.
+ *
+ * Void spikes survive on purpose: a reward that erased the one threat the player
+ * is meant to dodge would teach the wrong reflex, and it would make the safest
+ * play "grab nova, then ignore red".
+ */
+function detonateNova(game) {
+  const { theme } = game;
+  let cleared = 0;
+
+  for (const projectile of game.projectiles) {
+    if (!projectile.alive || !isBlockable(projectile)) continue;
+    projectile.alive = false;
+    cleared += 1;
+    game.score += projectile.archetype.score * game.multiplier;
+
+    emitBurst(game.effects, {
+      x: toScreenX(game.viewport, projectile.angle, projectile.distance),
+      y: toScreenY(game.viewport, projectile.angle, projectile.distance),
+      color: theme.colors[colorKeyOf(projectile)],
+      count: 10,
+      speed: 300,
+      size: 2,
+    });
+  }
+
+  game.blocks += cleared;
+  game.shake = Math.min(CONFIG.feel.maxShake, game.shake + 0.02);
+  emitWave(game.effects, {
+    x: game.viewport.centerX,
+    y: game.viewport.centerY,
+    color: theme.colors.pickup,
+    radius: game.viewport.unit * CONFIG.world.coreRadius,
+    life: 0.6,
+    thickness: 7,
+    growth: 900,
+  });
 }
 
 function onVoidPass(game) {
