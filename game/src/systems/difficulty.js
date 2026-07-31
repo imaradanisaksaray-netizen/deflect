@@ -38,6 +38,9 @@ export function difficultyAt(elapsed) {
     spawnInterval: baseInterval / overdrive,
     voidChance: voidChanceAt(elapsed, overtime),
     burstChance: burstChanceAt(curve, overtime),
+    // Advanced threats stay rare early in a run even once unlocked, so the
+    // opening minute always plays like the game the player already knows.
+    advancedChance: lerp(0, difficulty.advancedChanceEnd, curve),
   };
 }
 

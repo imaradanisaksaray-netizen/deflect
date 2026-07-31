@@ -118,6 +118,20 @@ export function playBlock(comboStep) {
   tone({ freq: base, glideTo: base * 1.6, type: 'square', duration: 0.09, gain: 0.16 });
 }
 
+/**
+ * Armoured shell breaking: a short metallic tick, deliberately unlike the block
+ * blip so the player hears "not done yet" rather than "destroyed".
+ */
+export function playShellCrack() {
+  tone({ freq: 1400, glideTo: 700, type: 'square', duration: 0.05, gain: 0.12 });
+  noise({ duration: 0.12, gain: 0.14, frequency: 2600, q: 2.4 });
+}
+
+/** A mimic dropping its disguise — a short downward warning. */
+export function playReveal() {
+  tone({ freq: 900, glideTo: 220, type: 'sawtooth', duration: 0.18, gain: 0.16 });
+}
+
 export function playGold() {
   tone({ freq: 660, type: 'triangle', duration: 0.09, gain: 0.2 });
   tone({ freq: 880, type: 'triangle', duration: 0.12, gain: 0.18, delay: 0.06 });

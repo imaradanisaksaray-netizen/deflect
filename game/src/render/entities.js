@@ -7,6 +7,7 @@
  */
 
 import { CONFIG, SHARD_TYPES } from '../config.js';
+import { colorKeyOf, shapeOf } from '../entities/projectiles.js';
 import { TAU, clamp } from '../math.js';
 import { toScreenX, toScreenY } from '../viewport.js';
 import { neonStroke, radialGlow, withAlpha } from './neon.js';
@@ -154,7 +155,7 @@ function drawEdgeWarning(ctx, viewport, projectile, limit, time, theme) {
     context.lineTo(-size * 0.3, size * 0.75);
     context.closePath();
   }, {
-    color: theme.colors[projectile.archetype.colorKey],
+    color: theme.colors[colorKeyOf(projectile)],
     width: unit * 0.005,
     intensity: (0.35 + proximity * 0.65) * pulse,
     core: false,
@@ -164,50 +165,104 @@ function drawEdgeWarning(ctx, viewport, projectile, limit, time, theme) {
 
 function drawShard(ctx, viewport, projectile, time, theme) {
   const { unit } = viewport;
-  const { angle, distance, archetype } = projectile;
+  const { angle, distance } = projectile;
   const x = toScreenX(viewport, angle, distance);
   const y = toScreenY(viewport, angle, distance);
-  const radius = unit * CONFIG.world.projectileRadius;
+  const radius = unit * CONFIG.world.projectileRadius * projectile.sizeScale;
   const fadeIn = clamp(projectile.age * 4, 0, 1);
+  // A revealed mimic answers with the void colour and the spike shape.
+  const color = theme.colors[colorKeyOf(projectile)];
+  const shape = shapeOf(projectile);
 
   drawTrail(ctx, viewport, projectile, fadeIn, theme);
-  radialGlow(ctx, x, y, radius * 2.6, theme.colors[archetype.colorKey], 0.55 * fadeIn);
+  radialGlow(ctx, x, y, radius * 2.6, color, 0.55 * fadeIn);
+
+  // The moment of a reveal gets its own flare, so the switch is impossible to
+  // miss even in a crowded frame.
+  if (projectile.revealFlash > 0.01) {
+    radialGlow(ctx, x, y, radius * (3 + projectile.revealFlash * 5), color, projectile.revealFlash);
+  }
 
   ctx.save();
   ctx.translate(x, y);
+  drawShardShape(ctx, shape, radius, unit, color, fadeIn, projectile, time);
+  ctx.restore();
+}
 
-  if (archetype.shape === 'circle') {
-    ctx.rotate(projectile.spin * 0.4);
+/** Shape drawing shared by in-flight shards and the menu icons. */
+function drawShardShape(ctx, shape, radius, unit, color, intensity, projectile, time) {
+  const spin = projectile ? projectile.spin : 0;
+  const stroke = unit * 0.008;
+
+  if (shape === 'circle') {
+    ctx.rotate(spin * 0.4);
     neonStroke(ctx, (context) => {
       context.arc(0, 0, radius * 0.62, 0, TAU);
-    }, { color: theme.colors[archetype.colorKey], width: unit * 0.008, intensity: fadeIn });
-  } else if (archetype.shape === 'diamond') {
-    ctx.rotate(projectile.spin);
+    }, { color, width: stroke, intensity });
+    return;
+  }
+
+  if (shape === 'diamond') {
+    ctx.rotate(spin);
     neonStroke(ctx, (context) => {
       context.moveTo(0, -radius * 0.8);
       context.lineTo(radius * 0.62, 0);
       context.lineTo(0, radius * 0.8);
       context.lineTo(-radius * 0.62, 0);
       context.closePath();
-    }, { color: theme.colors[archetype.colorKey], width: unit * 0.008, intensity: fadeIn });
-  } else {
-    ctx.rotate(-projectile.spin * 1.3);
-    const spikes = 3;
-    const throb = 1 + Math.sin(time * 7 + projectile.spin) * 0.08;
-    neonStroke(ctx, (context) => {
-      for (let i = 0; i < spikes * 2; i += 1) {
-        const spikeAngle = (i / (spikes * 2)) * TAU;
-        const spikeRadius = (i % 2 === 0 ? radius * 0.95 : radius * 0.34) * throb;
-        const px = Math.cos(spikeAngle) * spikeRadius;
-        const py = Math.sin(spikeAngle) * spikeRadius;
-        if (i === 0) context.moveTo(px, py);
-        else context.lineTo(px, py);
-      }
-      context.closePath();
-    }, { color: theme.colors[archetype.colorKey], width: unit * 0.009, intensity: fadeIn });
+    }, { color, width: stroke, intensity });
+    return;
   }
 
-  ctx.restore();
+  // Splitter: concentric rings read as "there is another one inside".
+  if (shape === 'ringed') {
+    ctx.rotate(spin * 0.3);
+    neonStroke(ctx, (context) => {
+      context.arc(0, 0, radius * 0.82, 0, TAU);
+    }, { color, width: stroke, intensity });
+    neonStroke(ctx, (context) => {
+      context.arc(0, 0, radius * 0.4, 0, TAU);
+    }, { color, width: stroke * 0.8, intensity: intensity * 0.9 });
+    return;
+  }
+
+  // Armoured: a heavy bracketed shell around a small core. Once the shell is
+  // gone the brackets disappear and only the core is left, which tells the
+  // player at a glance that one more hit finishes it.
+  if (shape === 'shelled') {
+    const intact = !projectile || projectile.hitPoints > 1;
+    ctx.rotate(spin * 0.5);
+
+    if (intact) {
+      for (let i = 0; i < 4; i += 1) {
+        const start = (i / 4) * TAU + 0.35;
+        neonStroke(ctx, (context) => {
+          context.arc(0, 0, radius * 0.9, start, start + 0.9);
+        }, { color, width: stroke * 1.6, intensity, core: false });
+      }
+    }
+
+    neonStroke(ctx, (context) => {
+      context.arc(0, 0, radius * (intact ? 0.34 : 0.6), 0, TAU);
+    }, { color, width: stroke, intensity });
+    return;
+  }
+
+  // Spike (void, and revealed mimics).
+  ctx.rotate(-spin * 1.3);
+  const spikes = 3;
+  const throb = 1 + Math.sin(time * 7 + spin) * 0.08;
+  neonStroke(ctx, (context) => {
+    for (let i = 0; i < spikes * 2; i += 1) {
+      const spikeAngle = (i / (spikes * 2)) * TAU;
+      const spikeRadius = (i % 2 === 0 ? radius * 0.95 : radius * 0.34) * throb;
+      const px = Math.cos(spikeAngle) * spikeRadius;
+      const py = Math.sin(spikeAngle) * spikeRadius;
+      if (i === 0) context.moveTo(px, py);
+      else context.lineTo(px, py);
+    }
+    context.closePath();
+  }, { color, width: unit * 0.009, intensity });
 }
 
 function drawTrail(ctx, viewport, projectile, fadeIn, theme) {
@@ -221,8 +276,8 @@ function drawTrail(ctx, viewport, projectile, fadeIn, theme) {
   const toY = toScreenY(viewport, projectile.angle, projectile.distance);
 
   const gradient = ctx.createLinearGradient(fromX, fromY, toX, toY);
-  gradient.addColorStop(0, withAlpha(theme.colors[projectile.archetype.colorKey], 0));
-  gradient.addColorStop(1, withAlpha(theme.colors[projectile.archetype.colorKey], 0.5 * fadeIn));
+  gradient.addColorStop(0, withAlpha(theme.colors[colorKeyOf(projectile)], 0));
+  gradient.addColorStop(1, withAlpha(theme.colors[colorKeyOf(projectile)], 0.5 * fadeIn));
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -239,37 +294,13 @@ function drawTrail(ctx, viewport, projectile, fadeIn, theme) {
 /** Small preview shard used by the menu's how-to-play row. */
 export function drawShardIcon(ctx, x, y, size, typeKey, spin, theme) {
   const archetype = SHARD_TYPES[typeKey];
-  radialGlow(ctx, x, y, size * 2, theme.colors[archetype.colorKey], 0.5);
+  const color = theme.colors[archetype.colorKey];
+  radialGlow(ctx, x, y, size * 2, color, 0.5);
 
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(spin);
-
-  if (archetype.shape === 'circle') {
-    neonStroke(ctx, (context) => context.arc(0, 0, size * 0.62, 0, TAU), {
-      color: theme.colors[archetype.colorKey], width: size * 0.2, intensity: 1,
-    });
-  } else if (archetype.shape === 'diamond') {
-    neonStroke(ctx, (context) => {
-      context.moveTo(0, -size * 0.8);
-      context.lineTo(size * 0.62, 0);
-      context.lineTo(0, size * 0.8);
-      context.lineTo(-size * 0.62, 0);
-      context.closePath();
-    }, { color: theme.colors[archetype.colorKey], width: size * 0.2, intensity: 1 });
-  } else {
-    neonStroke(ctx, (context) => {
-      for (let i = 0; i < 6; i += 1) {
-        const angle = (i / 6) * TAU;
-        const radius = i % 2 === 0 ? size * 0.95 : size * 0.34;
-        const px = Math.cos(angle) * radius;
-        const py = Math.sin(angle) * radius;
-        if (i === 0) context.moveTo(px, py);
-        else context.lineTo(px, py);
-      }
-      context.closePath();
-    }, { color: theme.colors[archetype.colorKey], width: size * 0.22, intensity: 1 });
-  }
-
+  // Icons reuse the in-flight shapes so the menu can never drift from the game.
+  drawShardShape(ctx, archetype.shape, size, size * 4, color, 1, { spin, hitPoints: archetype.hitPoints ?? 1 }, 0);
   ctx.restore();
 }
+

@@ -50,6 +50,8 @@ export const CONFIG = {
     voidGraceTime: 14,
     voidChanceEnd: 0.28,
     goldChance: 0.09,
+    /** Share of spawns that use an unlocked advanced type, at full ramp. */
+    advancedChanceEnd: 0.3,
     /** Late-game chance of spawning two shards at once. */
     burstChanceEnd: 0.34,
     /**
@@ -109,6 +111,7 @@ export const SHARD_TYPES = {
     speedScale: 1,
     score: CONFIG.play.scorePerBlock,
     blockable: true,
+    unlockAtSeconds: 0,
   },
   gold: {
     key: 'gold',
@@ -117,6 +120,7 @@ export const SHARD_TYPES = {
     speedScale: 1.35,
     score: CONFIG.play.scorePerGold,
     blockable: true,
+    unlockAtSeconds: 0,
   },
   void: {
     key: 'void',
@@ -125,5 +129,87 @@ export const SHARD_TYPES = {
     speedScale: 0.86,
     score: 0,
     blockable: false,
+    unlockAtSeconds: 0,
+  },
+
+  /** Blocking it releases two smaller fragments that must also be caught. */
+  splitter: {
+    key: 'splitter',
+    colorKey: 'shard',
+    shape: 'ringed',
+    speedScale: 0.82,
+    score: 15,
+    blockable: true,
+    unlockAtSeconds: 600,
+    label: 'SPLITTER',
+    hint: 'IT BREAKS IN TWO',
+    splitInto: 2,
+    /** Fragment offset from the parent bearing, in radians. */
+    splitSpread: 0.34,
+  },
+
+  /** Needs two hits: the first cracks the shell, the second destroys it. */
+  shelled: {
+    key: 'shelled',
+    colorKey: 'shard',
+    shape: 'shelled',
+    speedScale: 0.72,
+    score: 30,
+    blockable: true,
+    unlockAtSeconds: 1500,
+    label: 'ARMOURED',
+    hint: 'HIT IT TWICE',
+    hitPoints: 2,
+    /** How far the shard is pushed back when its shell breaks, in units. */
+    knockback: 0.16,
+  },
+
+  /**
+   * Looks like an ordinary shard until it nears the shield, then reveals itself
+   * as a spike. Reveal timing is enforced in projectiles.js so the player always
+   * gets a fair window to pull away.
+   */
+  mimic: {
+    key: 'mimic',
+    colorKey: 'shard',
+    shape: 'circle',
+    speedScale: 0.9,
+    score: 0,
+    blockable: true,
+    unlockAtSeconds: 2700,
+    label: 'MIMIC',
+    hint: 'NOT EVERYTHING IS WHAT IT SEEMS',
+    revealsAsVoid: true,
+    /**
+     * Fraction of the approach the player still has left when the disguise
+     * drops. Expressed as a share of the flight rather than a fixed number of
+     * seconds: at OVERDRIVE speeds the whole approach lasts well under a second,
+     * so any constant lead time would either be impossible to honour or would
+     * reveal the mimic the instant it spawns.
+     */
+    revealAtFraction: 0.45,
+  },
+
+  /** Arrives as a tight burst from one bearing; hold the shield still. */
+  swarm: {
+    key: 'swarm',
+    colorKey: 'shard',
+    shape: 'circle',
+    speedScale: 1.1,
+    score: 6,
+    blockable: true,
+    unlockAtSeconds: 4200,
+    label: 'SWARM',
+    hint: 'HOLD YOUR GROUND',
+    sizeScale: 0.62,
+    burstSize: 4,
+    /** Gap between swarm members, in units of travel distance. */
+    burstGap: 0.07,
   },
 };
+
+/** Types that exist from the very first run. */
+export const BASE_TYPES = ['shard', 'gold', 'void'];
+
+/** Types that unlock as total play time accumulates. */
+export const ADVANCED_TYPES = ['splitter', 'shelled', 'mimic', 'swarm'];

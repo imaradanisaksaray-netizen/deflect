@@ -14,18 +14,20 @@ import {
   playGameOver,
   playGold,
   playNewRecord,
+  playReveal,
+  playShellCrack,
   playStart,
   playVoidPass,
 } from '../audio.js';
 import { clamp, damp, rand } from '../math.js';
 import { createShield, registerImpact, updateShield } from '../entities/shield.js';
-import { updateProjectiles } from '../entities/projectiles.js';
+import { colorKeyOf, createFragments, updateProjectiles } from '../entities/projectiles.js';
 import { clearEffects, createEffects, emitBurst, emitWave, updateEffects } from '../entities/particles.js';
 import { resolveCollisions } from '../systems/collision.js';
 import { createSpawner, updateSpawner } from '../systems/spawner.js';
 import { difficultyAt } from '../systems/difficulty.js';
 import { loadProfile, markUnlocksSeen, recordRun, saveProfile } from '../progress/profile.js';
-import { collectUnlocks } from '../progress/unlocks.js';
+import { collectUnlocks, unlockedTypeKeys } from '../progress/unlocks.js';
 import { getTheme } from '../themes/index.js';
 import { toScreenX, toScreenY } from '../viewport.js';
 
@@ -51,6 +53,8 @@ export function createGame(viewport, input) {
     pendingUnlocks: [],
     /** Shards blocked in the current run — folded into the profile at run end. */
     blocks: 0,
+    /** Shard types the profile has unlocked; the spawner draws from this. */
+    availableTypes: unlockedTypeKeys(profile),
     screen: SCREEN.menu,
     shield: createShield(),
     projectiles: [],
@@ -95,6 +99,8 @@ export function startRun(game) {
   game.introFade = 0;
   game.blocks = 0;
   game.pendingUnlocks = [];
+  // Re-read in case the previous run unlocked a new threat.
+  game.availableTypes = unlockedTypeKeys(game.profile);
   clearEffects(game.effects);
   playStart();
 }
@@ -187,12 +193,28 @@ export function updateGame(game, dt) {
 
   updateSpawner(game.spawner, game, game.difficulty, scaledDt);
   updateProjectiles(game.projectiles, scaledDt);
+  announceReveals(game);
 
   const events = [];
   resolveCollisions(game, events);
   applyEvents(game, events);
 
   game.score += CONFIG.play.scorePerSecond * game.multiplier * scaledDt;
+}
+
+/**
+ * Plays the warning sting the first time each mimic drops its disguise.
+ *
+ * The reveal itself happens in projectiles.js, which has no business importing
+ * audio — so the sound is triggered here, once per shard.
+ */
+function announceReveals(game) {
+  for (const projectile of game.projectiles) {
+    if (projectile.revealed && !projectile.revealAnnounced) {
+      projectile.revealAnnounced = true;
+      playReveal();
+    }
+  }
 }
 
 function applyEvents(game, events) {
@@ -204,6 +226,9 @@ function applyEvents(game, events) {
       case 'voidBlock':
       case 'coreHit':
         onDamage(game, event);
+        break;
+      case 'shellCrack':
+        onShellCrack(game, event);
         break;
       case 'voidPass':
         onVoidPass(game);
@@ -234,7 +259,7 @@ function onBlock(game, event) {
 
   const x = toScreenX(game.viewport, projectile.angle, event.distance);
   const y = toScreenY(game.viewport, projectile.angle, event.distance);
-  const color = theme.colors[projectile.archetype.colorKey];
+  const color = theme.colors[colorKeyOf(projectile)];
 
   emitBurst(game.effects, {
     x,
@@ -257,6 +282,37 @@ function onBlock(game, event) {
 
   if (isGold) playGold();
   else playBlock(game.multiplier - 1);
+
+  // A splitter is only half dealt with: destroying it releases fragments that
+  // re-enter from just outside the shield band, so they cannot collide on the
+  // same frame they are born.
+  if (projectile.archetype.splitInto) {
+    const releaseDistance = event.distance + 0.07;
+    game.projectiles.push(...createFragments(projectile, releaseDistance));
+  }
+}
+
+/** Armoured shard survived a block: shell gone, shard pushed back out. */
+function onShellCrack(game, event) {
+  const { theme } = game;
+  const { projectile } = event;
+  const x = toScreenX(game.viewport, projectile.angle, event.distance);
+  const y = toScreenY(game.viewport, projectile.angle, event.distance);
+
+  emitBurst(game.effects, {
+    x,
+    y,
+    color: theme.colors.shieldEdge,
+    count: 12,
+    direction: projectile.angle + Math.PI,
+    spread: 1.6,
+    speed: 220,
+    size: 2,
+  });
+
+  registerImpact(game.shield, 0.6);
+  game.shake = Math.min(CONFIG.feel.maxShake, game.shake + 0.004);
+  playShellCrack();
 }
 
 function onDamage(game, event) {
@@ -268,7 +324,7 @@ function onDamage(game, event) {
   emitBurst(game.effects, {
     x,
     y,
-    color: theme.colors[projectile.archetype.colorKey],
+    color: theme.colors[colorKeyOf(projectile)],
     count: 30,
     speed: 420,
   });
