@@ -7,6 +7,7 @@ import { toggleMute, unlockAudio } from './audio.js';
 import { createProjectile } from './entities/projectiles.js';
 import { createPickup } from './systems/pickups.js';
 import * as adProvider from './ads/provider.js';
+import { bindNativeShell, initNativeAds } from './native.js';
 import * as menu from './ui/menu.js';
 import { createInput } from './input.js';
 import { createRenderer, render } from './render/renderer.js';
@@ -14,6 +15,7 @@ import {
   applyTheme,
   createGame,
   handleAction,
+  navigateBack,
   navigateMenu,
   openThemePicker,
   pauseIfPlaying,
@@ -43,6 +45,15 @@ const input = createInput(canvas, viewport, {
 
 const game = createGame(viewport, input.state);
 const renderer = createRenderer(ctx, viewport, game.theme);
+
+// No-ops on the web. On Android these are the difference between a game and a
+// web page in a box: the back button goes up a level instead of closing the
+// app, and losing focus pauses the run.
+initNativeAds();
+bindNativeShell({
+  onBack: () => navigateBack(game),
+  onPause: () => pauseIfPlaying(game),
+});
 
 function applyResize() {
   resizeViewport(viewport, canvas, ctx);

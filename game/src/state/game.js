@@ -418,6 +418,35 @@ export function togglePause(game) {
   return undefined;
 }
 
+/**
+ * Handles a "go up one level" request — the Android back button.
+ *
+ * Returns false only at the top of the tree, where the caller is expected to
+ * close the app. Anywhere else the press is consumed: a back press should never
+ * exit an app from the middle of a run.
+ */
+export function navigateBack(game) {
+  if (game.adBusy) return true;
+
+  if (isMenuScreen(game.screen) && game.screen !== SCREEN.menu) {
+    goToMenu(game);
+    return true;
+  }
+
+  if (game.screen === SCREEN.playing) {
+    game.screen = SCREEN.paused;
+    return true;
+  }
+
+  if (game.screen === SCREEN.paused || game.screen === SCREEN.gameover) {
+    game.screen = SCREEN.menu;
+    game.menuSelection = -1;
+    return true;
+  }
+
+  return false;
+}
+
 /** Opens the theme picker directly — bound to [T]. */
 export function openThemePicker(game) {
   if (!isMenuScreen(game.screen)) return;

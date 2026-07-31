@@ -25,7 +25,7 @@ import {
   recordRewarded,
   shouldShowInterstitial,
 } from '../game/src/ads/policy.js';
-import { createAdService, detectProvider } from '../game/src/ads/provider.js';
+import { AD_UNITS, createAdService, detectProvider } from '../game/src/ads/provider.js';
 
 const T0 = 1_000_000;
 
@@ -269,4 +269,54 @@ test('a dismissed rewarded ad reports false', async () => {
   });
 
   assert.equal(await service.showRewarded(), false, 'closing an ad early must pay nothing');
+});
+
+test('the native shell is detected and takes priority', () => {
+  // Inside a Capacitor build AdMob is the only thing that can serve, so it must
+  // win even if a portal SDK somehow lingers on the page.
+  const admob = {
+    prepareInterstitial: () => Promise.resolve(),
+    showInterstitial: () => Promise.resolve(),
+    prepareRewardVideoAd: () => Promise.resolve(),
+    showRewardVideoAd: () => Promise.resolve({ type: 'life', amount: 1 }),
+  };
+
+  assert.equal(detectProvider({ Capacitor: { Plugins: { AdMob: admob } } }).id, 'admob');
+  assert.equal(
+    detectProvider({
+      Capacitor: { Plugins: { AdMob: admob } },
+      CrazyGames: { SDK: { ad: { requestAd: () => {} } } },
+    }).id,
+    'admob',
+  );
+});
+
+test('a half-loaded AdMob plugin is ignored', () => {
+  assert.equal(detectProvider({ Capacitor: { Plugins: { AdMob: {} } } }).id, 'none');
+  assert.equal(detectProvider({ Capacitor: {} }).id, 'none');
+});
+
+test('an AdMob rewarded ad pays out only with a reward item', async () => {
+  const make = (reward) => createAdService(detectProvider({
+    Capacitor: {
+      Plugins: {
+        AdMob: {
+          prepareInterstitial: () => Promise.resolve(),
+          showInterstitial: () => Promise.resolve(),
+          prepareRewardVideoAd: () => Promise.resolve(),
+          showRewardVideoAd: () => Promise.resolve(reward),
+        },
+      },
+    },
+  }));
+
+  assert.equal(await make({ type: 'life', amount: 1 }).showRewarded(), true);
+  assert.equal(await make(null).showRewarded(), false, 'closing early pays nothing');
+  assert.equal(await make(undefined).showRewarded(), false);
+});
+
+test('ad unit ids are present and well formed', () => {
+  for (const [slot, id] of Object.entries(AD_UNITS)) {
+    assert.match(id, /^ca-app-pub-\d+\/\d+$/, `${slot} is not a valid AdMob unit id`);
+  }
 });

@@ -4,3 +4,23 @@ node_modules/
 .DS_Store
 Thumbs.db
 .gstack/
+
+# Generated image sources — `npm run build:icons` recreates them, and the
+# Android resources they produce are committed under android/app/src/main/res.
+android-assets/
+assets/
+
+# Android build output and machine-local settings.
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/.idea/
+android/app/release/
+android/capacitor-cordova-android-plugins/
+
+# Signing material. Losing the keystore means the app can never be updated;
+# committing it means anyone with the repo can publish as you.
+*.jks
+*.keystore
+android/keystore.properties

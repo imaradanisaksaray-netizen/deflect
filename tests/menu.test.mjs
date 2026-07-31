@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 
 import { PICKUP_TYPES, SHARD_TYPES } from '../game/src/config.js';
 import { HELP_LAYOUT } from '../game/src/render/screens.js';
-import { SCREEN } from '../game/src/state/game.js';
+import { SCREEN, navigateBack } from '../game/src/state/game.js';
 import { createProfile } from '../game/src/progress/profile.js';
 import { THEMES } from '../game/src/themes/index.js';
 import {
@@ -202,4 +202,42 @@ test('every tab maps to a real screen id', () => {
   for (const tab of MENU_TABS) {
     assert.equal(SCREEN[tab.id], tab.id, `${tab.id} is not a screen`);
   }
+});
+
+test('the back button goes up one level and only exits at the top', () => {
+  // Android's hardware back. Returning false is a request to close the app, so
+  // it must be false in exactly one place: the main menu.
+  const game = (screen, extra = {}) => ({
+    screen, menuSelection: 2, adBusy: false, viewport: VIEWPORTS[0], ...extra,
+  });
+
+  for (const screen of ['themes', 'scores', 'stats', 'help']) {
+    const state = game(screen);
+    assert.equal(navigateBack(state), true, `${screen} must consume the press`);
+    assert.equal(state.screen, 'menu');
+    assert.equal(state.menuSelection, -1, 'the stale highlight must be cleared');
+  }
+
+  const playing = game('playing');
+  assert.equal(navigateBack(playing), true);
+  assert.equal(playing.screen, 'paused', 'back during a run pauses rather than quits');
+
+  const paused = game('paused');
+  assert.equal(navigateBack(paused), true);
+  assert.equal(paused.screen, 'menu');
+
+  const over = game('gameover');
+  assert.equal(navigateBack(over), true);
+  assert.equal(over.screen, 'menu');
+
+  assert.equal(navigateBack(game('menu')), false, 'the menu is where back exits the app');
+});
+
+test('the back button is swallowed while an ad is up', () => {
+  // Backing out of an ad would leave the SDK holding a screen the game has
+  // already navigated away from.
+  const state = { screen: 'gameover', adBusy: true, menuSelection: -1, viewport: VIEWPORTS[0] };
+
+  assert.equal(navigateBack(state), true);
+  assert.equal(state.screen, 'gameover', 'nothing moves until the ad releases');
 });

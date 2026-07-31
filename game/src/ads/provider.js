@@ -61,6 +61,41 @@ function crazyGamesProvider(sdk) {
   };
 }
 
+/**
+ * Google AdMob via the Capacitor plugin, used by the Android build.
+ *
+ * Reached through `window.Capacitor.Plugins` rather than an import, which keeps
+ * the web build free of a dependency it would never use — the same passive
+ * detection every other provider here uses.
+ *
+ * AdMob needs each ad prepared before it can be shown, and a rewarded ad only
+ * counts if the SDK hands back a reward item. Both are folded into the same
+ * promise contract as the portals so the game cannot tell them apart.
+ */
+function admobProvider(admob, unitIds) {
+  const interstitial = async () => {
+    await admob.prepareInterstitial({ adId: unitIds.interstitial });
+    await admob.showInterstitial();
+    return true;
+  };
+
+  const rewarded = async () => {
+    await admob.prepareRewardVideoAd({ adId: unitIds.rewarded });
+    const reward = await admob.showRewardVideoAd();
+    // No reward item means the user closed it early.
+    return Boolean(reward && (reward.amount ?? 0) >= 0 && reward.type !== undefined);
+  };
+
+  return {
+    id: 'admob',
+    showInterstitial: interstitial,
+    showRewarded: rewarded,
+    gameplayStart: () => {},
+    gameplayStop: () => {},
+    celebrate: () => {},
+  };
+}
+
 /** Poki SDK. */
 function pokiProvider(sdk) {
   return {
@@ -81,8 +116,15 @@ function pokiProvider(sdk) {
  * Exported with an explicit `scope` so the choice can be tested without a
  * browser and without global state.
  */
-export function detectProvider(scope = globalThis) {
+export function detectProvider(scope = globalThis, unitIds = AD_UNITS) {
   try {
+    // The native shell is checked first: inside a Capacitor build there is no
+    // portal SDK to compete with, and AdMob is the only thing that can serve.
+    const admob = scope.Capacitor?.Plugins?.AdMob;
+    if (admob?.prepareInterstitial && admob?.showRewardVideoAd) {
+      return admobProvider(admob, unitIds);
+    }
+
     const crazy = scope.CrazyGames?.SDK;
     if (crazy?.ad?.requestAd) return crazyGamesProvider(crazy);
 
@@ -94,6 +136,19 @@ export function detectProvider(scope = globalThis) {
 
   return noProvider;
 }
+
+/**
+ * AdMob ad unit ids.
+ *
+ * These are Google's public test units. They must be replaced with the real
+ * ones before a production release — shipping test units means the app serves
+ * ads that earn nothing, and serving *real* ads during development is a policy
+ * violation that gets accounts suspended. See docs/android.md.
+ */
+export const AD_UNITS = {
+  interstitial: 'ca-app-pub-3940256099942544/1033173712',
+  rewarded: 'ca-app-pub-3940256099942544/5224354917',
+};
 
 /**
  * Resolves to `fallback` if the promise has not settled in time.
