@@ -9,10 +9,10 @@
 import { CONFIG, PICKUP_TYPES } from '../config.js';
 import { isMuted } from '../audio.js';
 import { clamp, easeOutCubic } from '../math.js';
-import { SCREEN } from '../state/game.js';
+import { SCREEN, canContinueWithAd } from '../state/game.js';
 import { cutoffScore } from '../progress/leaderboard.js';
 import { nextThemeGoal } from '../progress/unlocks.js';
-import { tabButtons } from '../ui/menu.js';
+import { continueButton, tabButtons } from '../ui/menu.js';
 import { drawShardIcon } from './entities.js';
 import { drawButton } from './screens.js';
 import { neonText, plainText, withAlpha } from './neon.js';
@@ -417,6 +417,7 @@ export function drawGameOver(ctx, game) {
   });
 
   drawUnlockCard(ctx, game);
+  drawContinueOffer(ctx, game);
 
   if (elapsed < 0.6) return;
   plainText(ctx, 'CLICK  /  TAP  /  SPACE  TO  RETRY', width / 2, height * 0.82, {
@@ -424,6 +425,30 @@ export function drawGameOver(ctx, game) {
     color: theme.colors.text,
     spacing: unit * 0.006,
     alpha: 0.55 + 0.45 * Math.sin(time * 3.4),
+  });
+}
+
+/**
+ * The "watch an ad, keep this run" offer.
+ *
+ * Drawn only when the ad layer can actually deliver one, so builds outside a
+ * portal never show a button that would do nothing. It is styled as an option
+ * rather than a demand — the free retry prompt below it stays the louder of
+ * the two.
+ */
+function drawContinueOffer(ctx, game) {
+  if (!canContinueWithAd(game)) return;
+
+  const { theme, viewport } = game;
+  const button = continueButton(viewport);
+
+  drawButton(ctx, game, button, { selected: false, accent: theme.colors.pickup });
+
+  plainText(ctx, 'ONCE PER RUN', viewport.width / 2, button.y + button.h + viewport.unit * 0.026, {
+    size: viewport.unit * 0.017,
+    color: theme.colors.textDim,
+    spacing: viewport.unit * 0.004,
+    alpha: 0.5,
   });
 }
 

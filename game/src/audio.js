@@ -56,6 +56,22 @@ export function toggleMute() {
 }
 
 /**
+ * Silences the game for the duration of an ad, without touching the player's
+ * own mute preference — an ad must never leave the sound toggle in a state the
+ * player did not choose.
+ *
+ * Every portal requires this: two audio sources playing at once is the fastest
+ * way to fail a store review.
+ */
+export function suspendAudio() {
+  if (context && context.state === 'running') context.suspend();
+}
+
+export function resumeAudio() {
+  if (context && context.state === 'suspended') context.resume();
+}
+
+/**
  * Plays a single shaped tone.
  * `glideTo` sweeps the frequency across the note, which is what gives the
  * blips their arcade character.

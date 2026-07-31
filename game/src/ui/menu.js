@@ -79,6 +79,28 @@ export function backButton(viewport) {
 }
 
 /**
+ * "Watch an ad, keep this run" button on the death screen.
+ *
+ * Placed below the score and above the retry prompt, so the free option is
+ * always the one the eye reaches last — a continue offer should be available,
+ * not pushy.
+ */
+export function continueButton(viewport) {
+  const { width, height, unit } = viewport;
+  const w = Math.max(unit * 0.34, MIN_TOUCH);
+  const h = Math.max(unit * 0.07, MIN_TOUCH);
+
+  return {
+    id: 'continue',
+    label: 'WATCH AD  +1 LIFE',
+    x: width / 2 - w / 2,
+    y: height * 0.7 - h / 2,
+    w,
+    h,
+  };
+}
+
+/**
  * Theme picker grid.
  *
  * Locked themes stay in the grid rather than being hidden. Seeing what is

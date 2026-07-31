@@ -6,6 +6,7 @@ import { CONFIG } from './config.js';
 import { toggleMute, unlockAudio } from './audio.js';
 import { createProjectile } from './entities/projectiles.js';
 import { createPickup } from './systems/pickups.js';
+import * as adProvider from './ads/provider.js';
 import * as menu from './ui/menu.js';
 import { createInput } from './input.js';
 import { createRenderer, render } from './render/renderer.js';
@@ -67,6 +68,7 @@ window.addEventListener('blur', () => pauseIfPlaying(game));
 // outcome. Read-mostly game state; nothing here changes how the game plays.
 window.__deflect = {
   game, viewport, applyTheme, themes: THEMES, createProjectile, createPickup, menu,
+  adProvider,
 };
 
 let lastFrameTime = performance.now();

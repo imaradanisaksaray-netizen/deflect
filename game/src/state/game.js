@@ -28,11 +28,27 @@ import { resolveCollisions } from '../systems/collision.js';
 import { createPickupSpawner, updatePickupSpawner, updatePickups } from '../systems/pickups.js';
 import { createSpawner, updateSpawner } from '../systems/spawner.js';
 import { difficultyAt } from '../systems/difficulty.js';
+import {
+  beginRun as beginAdRun,
+  canOfferRewarded,
+  createAdPolicy,
+  recordDeath,
+  recordInterstitial,
+  recordRewarded,
+  shouldShowInterstitial,
+} from '../ads/policy.js';
+import { createAdService } from '../ads/provider.js';
 import { addRun, loadBoard, saveBoard } from '../progress/leaderboard.js';
 import { loadProfile, markUnlocksSeen, recordRun, saveProfile } from '../progress/profile.js';
 import { collectUnlocks, unlockedTypeKeys } from '../progress/unlocks.js';
 import { getTheme } from '../themes/index.js';
-import { backButton, hitTest, tabButtons, themeButtons } from '../ui/menu.js';
+import {
+  backButton,
+  continueButton,
+  hitTest,
+  tabButtons,
+  themeButtons,
+} from '../ui/menu.js';
 import { toScreenX, toScreenY } from '../viewport.js';
 
 export const SCREEN = {
@@ -53,7 +69,7 @@ const MENU_SCREENS = new Set([
 
 export const isMenuScreen = (screen) => MENU_SCREENS.has(screen);
 
-export function createGame(viewport, input) {
+export function createGame(viewport, input, ads = createAdService()) {
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   const profile = loadProfile();
 
@@ -61,6 +77,11 @@ export function createGame(viewport, input) {
     viewport,
     input,
     reducedMotion,
+    /** Ad transport. Resolves to "no ad" everywhere outside a portal. */
+    ads,
+    adPolicy: createAdPolicy(),
+    /** True while an ad is on screen; input is ignored until it clears. */
+    adBusy: false,
     /** Persistent progress across runs. Replaced (not mutated) on every save. */
     profile,
     /** The ten best runs on this device, best first. */
@@ -133,7 +154,30 @@ export function startRun(game) {
   game.pendingUnlocks = [];
   // Re-read in case the previous run unlocked a new threat.
   game.availableTypes = unlockedTypeKeys(game.profile);
+  game.adPolicy = beginAdRun(game.adPolicy);
   clearEffects(game.effects);
+  game.ads.gameplayStart();
+  playStart();
+}
+
+/**
+ * Resumes the run that just ended, after a rewarded ad was watched.
+ *
+ * Everything the run earned is kept — score, elapsed time, difficulty — because
+ * a continue that reset progress would be a worse deal than restarting. Only
+ * the threats on screen are cleared, so the player is not killed again by the
+ * same shard before they can react.
+ */
+function continueRun(game) {
+  game.screen = SCREEN.playing;
+  game.projectiles.length = 0;
+  game.pickups.length = 0;
+  game.lives = 1;
+  game.invulnerable = CONFIG.play.invulnerableTime * 2;
+  game.combo = 0;
+  game.multiplier = 1;
+  game.coreFlash = 1;
+  game.ads.gameplayStart();
   playStart();
 }
 
@@ -175,13 +219,66 @@ function endRun(game) {
   game.lastRank = placement.rank;
   saveBoard(game.board);
 
+  game.ads.gameplayStop();
+  game.adPolicy = recordDeath(game.adPolicy);
+
   if (score > game.highScore) {
     game.highScore = score;
     game.newRecord = true;
     playNewRecord();
+    // Portals use this to decide when to surface an install or share prompt.
+    game.ads.celebrate();
   } else {
     playGameOver();
   }
+
+  maybeShowInterstitial(game);
+}
+
+/**
+ * Runs an interstitial if the policy allows one.
+ *
+ * Fire-and-forget: the death screen is already up and stays interactive-looking
+ * while the ad decides whether it exists. `adBusy` is set synchronously so a tap
+ * arriving during that window cannot start a run underneath the ad.
+ */
+function maybeShowInterstitial(game) {
+  if (!shouldShowInterstitial(game.adPolicy, Date.now())) return;
+
+  game.adBusy = true;
+  game.ads.showInterstitial().finally(() => {
+    // Recorded whether or not an ad actually appeared. If a request failed, the
+    // gap still applies — retrying on the very next death is how a broken SDK
+    // turns into an ad attempt after every single run.
+    game.adPolicy = recordInterstitial(game.adPolicy, Date.now());
+    game.adBusy = false;
+  });
+}
+
+/**
+ * Offers "watch an ad, keep this run" — once per run, and only when the ad
+ * layer can actually deliver one.
+ */
+export function canContinueWithAd(game) {
+  return game.screen === SCREEN.gameover
+    && game.ads.isEnabled
+    && !game.adBusy
+    && canOfferRewarded(game.adPolicy, { score: Math.floor(game.score) });
+}
+
+/** Plays a rewarded ad and resumes the run only if it was watched through. */
+export function watchAdToContinue(game) {
+  if (!canContinueWithAd(game)) return;
+
+  game.adBusy = true;
+  game.adPolicy = recordRewarded(game.adPolicy);
+
+  game.ads.showRewarded().then((watched) => {
+    game.adBusy = false;
+    // A dismissed or failed ad pays nothing. The offer is spent either way,
+    // which is what stops a player from farming retries on a broken SDK.
+    if (watched) continueRun(game);
+  });
 }
 
 /** Switches the active theme and remembers the choice. */
@@ -193,6 +290,11 @@ export function applyTheme(game, themeId) {
 
 /** Primary action: click / tap / Space. Meaning depends on the current screen. */
 export function handleAction(game) {
+  // While an ad is up, every tap belongs to the ad. Without this the tap that
+  // dismisses an interstitial would fall through and start a run the player
+  // never asked for.
+  if (game.adBusy) return undefined;
+
   if (game.screen === SCREEN.menu) return activateMenu(game);
   if (game.screen === SCREEN.themes) return activateThemePicker(game);
   if (game.screen === SCREEN.scores || game.screen === SCREEN.stats
@@ -200,9 +302,17 @@ export function handleAction(game) {
     return activateSubScreen(game);
   }
   if (game.screen === SCREEN.paused) game.screen = SCREEN.playing;
-  // A run is only restartable after a short beat, so the death tap never
-  // instantly burns the next run.
-  if (game.screen === SCREEN.gameover && game.elapsed > 0.6) return startRun(game);
+
+  if (game.screen === SCREEN.gameover) {
+    // The continue offer is a real button, so it has to be checked before the
+    // "tap anywhere to retry" rule swallows the tap.
+    if (canContinueWithAd(game) && pointerHit(game, [continueButton(game.viewport)])) {
+      return watchAdToContinue(game);
+    }
+    // A run is only restartable after a short beat, so the death tap never
+    // instantly burns the next run.
+    if (game.elapsed > 0.6) return startRun(game);
+  }
   return undefined;
 }
 
